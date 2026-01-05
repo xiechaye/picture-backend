@@ -8,12 +8,25 @@
     <name>picture-backend</name>
     <description>picture-backend</description>
     <properties>
-        <java.version>1.8</java.version>
+        <java.version>17</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <spring-boot.version>2.7.6</spring-boot.version>
+        <spring-boot.version>3.2.5</spring-boot.version>
     </properties>
     <dependencies>
+        <!-- Spring AI Alibaba Agent Framework -->
+        <dependency>
+            <groupId>com.alibaba.cloud.ai</groupId>
+            <artifactId>spring-ai-alibaba-agent-framework</artifactId>
+            <version>1.1.0.0-RC2</version>
+        </dependency>
+
+        <!-- DashScope ChatModel 支持（如果使用其他模型，请跳转 Spring AI 文档选择对应的 starter） -->
+        <dependency>
+            <groupId>com.alibaba.cloud.ai</groupId>
+            <artifactId>spring-ai-alibaba-starter-dashscope</artifactId>
+            <version>1.1.0.0-RC2</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -26,8 +39,8 @@
         <!-- 数据库操作：https://mp.baomidou.com/ -->
         <dependency>
             <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-boot-starter</artifactId>
-            <version>3.5.9</version>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+            <version>3.5.15</version>
         </dependency>
         <!-- MyBatis Plus 分页插件 -->
         <dependency>
@@ -64,7 +77,7 @@
         <!-- Sa-Token 权限认证 -->
         <dependency>
             <groupId>cn.dev33</groupId>
-            <artifactId>sa-token-spring-boot-starter</artifactId>
+            <artifactId>sa-token-spring-boot3-starter</artifactId>
             <version>1.39.0</version>
         </dependency>
         <!-- Sa-Token 整合 Redis （使用 jackson 序列化方式） -->
@@ -81,8 +94,8 @@
         <!-- 分库分表 -->
         <dependency>
             <groupId>org.apache.shardingsphere</groupId>
-            <artifactId>shardingsphere-jdbc-core-spring-boot-starter</artifactId>
-            <version>5.2.0</version>
+            <artifactId>shardingsphere-jdbc-core</artifactId>
+            <version>5.4.1</version>
         </dependency>
         <!-- HTML 解析：https://jsoup.org/ -->
         <dependency>
@@ -100,13 +113,13 @@
         <dependency>
             <groupId>cn.hutool</groupId>
             <artifactId>hutool-all</artifactId>
-            <version>5.8.26</version>
+            <version>5.8.38</version>
         </dependency>
         <!-- 接口文档：https://doc.xiaominfo.com/docs/quick-start#spring-boot-2-->
         <dependency>
             <groupId>com.github.xiaoymin</groupId>
-            <artifactId>knife4j-openapi2-spring-boot-starter</artifactId>
-            <version>4.4.0</version>
+            <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
+            <version>4.5.0</version>
         </dependency>
         <dependency>
             <groupId>com.mysql</groupId>
@@ -129,7 +142,7 @@
             <dependency>
                 <groupId>com.baomidou</groupId>
                 <artifactId>mybatis-plus-bom</artifactId>
-                <version>3.5.9</version>
+                <version>3.5.15</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -150,8 +163,8 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.8.1</version>
                 <configuration>
-                    <source>1.8</source>
-                    <target>1.8</target>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
                     <encoding>UTF-8</encoding>
                 </configuration>
             </plugin>

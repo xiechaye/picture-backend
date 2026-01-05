@@ -36,11 +36,6 @@ public class PictureShardingAlgorithm implements StandardShardingAlgorithm<Long>
     }
 
     @Override
-    public Properties getProps() {
-        return null;
-    }
-
-    @Override
     public void init(Properties properties) {
 
     }

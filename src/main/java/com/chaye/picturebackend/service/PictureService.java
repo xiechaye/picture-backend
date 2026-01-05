@@ -9,7 +9,7 @@ import com.chaye.picturebackend.model.entity.Picture;
 import com.chaye.picturebackend.model.entity.User;
 import com.chaye.picturebackend.model.vo.PictureVO;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 
 /**

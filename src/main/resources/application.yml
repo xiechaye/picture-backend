@@ -1,4 +1,7 @@
 server:
+  ai:
+    dashscope:
+      api-key: apikey
   port: 8123
   servlet:
     context-path: /api

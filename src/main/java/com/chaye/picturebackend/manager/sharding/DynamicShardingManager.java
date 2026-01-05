@@ -7,14 +7,14 @@ import com.chaye.picturebackend.model.enums.SpaceTypeEnum;
 import com.chaye.picturebackend.service.SpaceService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.shardingsphere.driver.jdbc.core.connection.ShardingSphereConnection;
-import org.apache.shardingsphere.infra.metadata.database.rule.ShardingSphereRuleMetaData;
+import org.apache.shardingsphere.infra.metadata.database.rule.RuleMetaData;
 import org.apache.shardingsphere.mode.manager.ContextManager;
 import org.apache.shardingsphere.sharding.api.config.ShardingRuleConfiguration;
 import org.apache.shardingsphere.sharding.api.config.rule.ShardingTableRuleConfiguration;
 import org.apache.shardingsphere.sharding.rule.ShardingRule;
 
-import javax.annotation.PostConstruct;
-import javax.annotation.Resource;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
 import javax.sql.DataSource;
 import java.sql.SQLException;
 import java.util.Collections;
@@ -73,7 +73,7 @@ public class DynamicShardingManager {
         log.info("动态分表 actual-data-nodes 配置: {}", newActualDataNodes);
 
         ContextManager contextManager = getContextManager();
-        ShardingSphereRuleMetaData ruleMetaData = contextManager.getMetaDataContexts()
+        RuleMetaData ruleMetaData = contextManager.getMetaDataContexts()
                 .getMetaData()
                 .getDatabases()
                 .get(DATABASE_NAME)
@@ -97,8 +97,10 @@ public class DynamicShardingManager {
                     })
                     .collect(Collectors.toList());
             ruleConfig.setTables(updatedRules);
-            contextManager.alterRuleConfiguration(DATABASE_NAME, Collections.singleton(ruleConfig));
-            contextManager.reloadDatabase(DATABASE_NAME);
+            contextManager.getInstanceContext().getModeContextManager()
+                    .alterRuleConfiguration(DATABASE_NAME, ruleConfig);
+            // todo 刷新数据库
+//            contextManager.reloadTable(DATABASE_NAME);
             log.info("动态分表规则更新成功！");
         } else {
             log.error("未找到 ShardingSphere 的分片规则配置，动态分表更新失败。");

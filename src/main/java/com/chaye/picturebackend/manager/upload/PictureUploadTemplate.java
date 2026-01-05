@@ -16,7 +16,7 @@ import com.chaye.picturebackend.manager.CosManager;
 import com.chaye.picturebackend.model.dto.file.UploadPictureResult;
 import lombok.extern.slf4j.Slf4j;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.io.File;
 import java.util.Date;
 import java.util.List;
