@@ -129,20 +129,31 @@ public class UserController {
 
     /**
      * 更新用户
+     * 管理员可以修改所有用户信息，用户只能修改本人信息
      */
     @PostMapping("/update")
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public BaseResponse<Boolean> updateUser(@RequestBody UserUpdateRequest userUpdateRequest) {
+    public BaseResponse<Boolean> updateUser(@RequestBody UserUpdateRequest userUpdateRequest, HttpServletRequest request) {
         if (userUpdateRequest == null || userUpdateRequest.getId() == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
+        
+        // 获取当前登录用户
+        User loginUser = userService.getLoginUser(request);
+        
+        // 检查是否是管理员或是否是本人
+        boolean isAdmin = UserConstant.ADMIN_ROLE.equals(loginUser.getUserRole());
+        boolean isOwnProfile = loginUser.getId().equals(userUpdateRequest.getId());
+        
+        if (!isAdmin && !isOwnProfile) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限修改其他用户信息");
+        }
+        
         User user = new User();
         BeanUtils.copyProperties(userUpdateRequest, user);
         boolean result = userService.updateById(user);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(true);
     }
-
     /**
      * 分页获取用户封装列表（仅管理员）
      *
