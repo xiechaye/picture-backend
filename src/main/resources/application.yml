@@ -1,7 +1,4 @@
 server:
-  ai:
-    dashscope:
-      api-key: apikey
   port: 8123
   servlet:
     context-path: /api
@@ -20,6 +17,10 @@ spring:
     url: jdbc:mysql://localhost:3306/chaye_picture
     username: root
     password: 123456
+  # Spring AI 配置
+  ai:
+    dashscope:
+      api-key: apikey
   # Redis 配置
   data:
     redis:
