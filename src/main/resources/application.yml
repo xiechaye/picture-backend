@@ -12,6 +12,8 @@ server:
 spring:
   application:
     name: picture-backend
+  profiles:
+    active: local
   # 数据库配置
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -95,4 +97,5 @@ knife4j:
 
 ## 阿里云 AI 配置
 #aliYunAi:
+#  model: xxx
 #  apiKey: xxx
