@@ -82,7 +82,18 @@ public class CosManager {
         // 构造处理参数
         picOperations.setRules(rules);
         putObjectRequest.setPicOperations(picOperations);
-        return cosClient.putObject(putObjectRequest);
+        try {
+            return cosClient.putObject(putObjectRequest);
+        } catch (Exception e) {
+            System.err.println("COS Upload Error - Bucket: " + cosClientConfig.getBucket());
+            System.err.println("COS Upload Error - Key: " + key);
+            System.err.println("COS Upload Error - Message: " + e.getMessage());
+            System.err.println("COS Upload Error - Type: " + e.getClass().getSimpleName());
+            if (e.getCause() != null) {
+                System.err.println("COS Upload Error - Cause: " + e.getCause().getMessage());
+            }
+            throw e;
+        }
     }
 
     /**
