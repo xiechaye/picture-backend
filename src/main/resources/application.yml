@@ -7,6 +7,8 @@ server:
       cookie:
         max-age: 2592000
 spring:
+  main:
+    allow-bean-definition-overriding: true
   application:
     name: picture-backend
   profiles:
@@ -17,10 +19,25 @@ spring:
     url: jdbc:mysql://localhost:3306/chaye_picture
     username: root
     password: 123456
+    # pgvector
+    vector:
+      driver-class-name: org.postgresql.Driver
+      url: jdbc:postgresql://localhost:5432/chaye_picture
+      username: myuser
+      password: EhpyKmjXRu714Q8GU4x1
   # Spring AI 配置
   ai:
+    vectorstore:
+      pgvector:
+        index-type: HNSW
+        dimensions: 1024
+        distance-type: COSINE_DISTANCE
+        max-document-batch-size: 10000 # Optional: Maximum number of documents per batch
     dashscope:
       api-key: apikey
+      chat:
+        options:
+          model: qwen-plus
   # Redis 配置
   data:
     redis:
