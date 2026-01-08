@@ -17,6 +17,7 @@ import com.chaye.picturebackend.exception.ThrowUtils;
 import com.chaye.picturebackend.manager.CosManager;
 import com.chaye.picturebackend.manager.FileManager;
 import com.chaye.picturebackend.manager.upload.FilePictureUpload;
+import com.chaye.picturebackend.config.RabbitMQConfig;
 import com.chaye.picturebackend.manager.upload.PictureUploadTemplate;
 import com.chaye.picturebackend.manager.upload.UrlPictureUpload;
 import com.chaye.picturebackend.mapper.PictureMapper;
@@ -38,6 +39,7 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
@@ -85,6 +87,9 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
 
     @Resource
     private AliYunAiApi aliYunAiApi;
+
+    @Resource
+    private RabbitTemplate rabbitTemplate;
 
     @Override
     public void validPicture(Picture picture) {
@@ -215,7 +220,20 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             }
             return picture;
         });
-        // 可自行实现，如果是更新，可以清理图片资源
+        
+        // 发送消息到RabbitMQ，让ImageMqListener处理图片的AI识别和向量存储
+        try {
+            rabbitTemplate.convertAndSend(
+                RabbitMQConfig.IMAGE_EXCHANGE_NAME,
+                RabbitMQConfig.IMAGE_ROUTING_KEY,
+                picture
+            );
+            log.info("图片上传成功，已发送消息到RabbitMQ，图片ID: {}", picture.getId());
+        } catch (Exception e) {
+            log.error("发送RabbitMQ消息失败，图片ID: {}", picture.getId(), e);
+        }
+        
+        // todo 可自行实现，如果是更新，可以清理图片资源
         // this.clearPictureFile(oldPicture);
         return PictureVO.objToVo(picture);
     }
