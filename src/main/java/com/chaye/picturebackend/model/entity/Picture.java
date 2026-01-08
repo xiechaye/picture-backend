@@ -1,16 +1,20 @@
 package com.chaye.picturebackend.model.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 import java.util.Date;
-import lombok.Data;
 
 /**
  * 图片
  * @TableName picture
  */
 @TableName(value ="picture")
+@NoArgsConstructor
+@AllArgsConstructor
 @Data
 public class Picture implements Serializable {
     /**
