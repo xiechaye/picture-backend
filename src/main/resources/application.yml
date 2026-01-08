@@ -31,6 +31,10 @@ spring:
     port: 5672
     username: guest
     password: guest
+    listener:
+      simple:
+        acknowledge-mode: manual # 开启手动确认
+        prefetch: 1 # 每次只取 1 条消息，防止 AI 处理慢导致消息堆积在内存
   # Spring AI 配置
   ai:
     vectorstore:
@@ -44,6 +48,9 @@ spring:
       chat:
         options:
           model: qwen-plus
+        embedding:
+          options:
+            model: text-embedding-v2
   # Redis 配置
   data:
     redis:
