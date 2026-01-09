@@ -147,4 +147,14 @@ public interface PictureService extends IService<Picture> {
      * @param loginUser
      */
     CreateOutPaintingTaskResponse createPictureOutPaintingTask(CreatePictureOutPaintingTaskRequest createPictureOutPaintingTaskRequest, User loginUser);
+
+    /**
+     * 语义搜索图片
+     * 如果有 spaceId：查询用户加入或拥有的空间中的图片
+     * 如果没有 spaceId：查询公共图库的图片
+     * @param searchRequest
+     * @param loginUser
+     * @return
+     */
+    List<PictureVO> searchPictureBySemantic(PictureSearchBySemanticRequest searchRequest, User loginUser);
 }

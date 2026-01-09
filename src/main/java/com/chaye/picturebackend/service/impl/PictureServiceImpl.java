@@ -11,13 +11,13 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.chaye.picturebackend.api.aliyunai.AliYunAiApi;
 import com.chaye.picturebackend.api.aliyunai.model.CreateOutPaintingTaskRequest;
 import com.chaye.picturebackend.api.aliyunai.model.CreateOutPaintingTaskResponse;
+import com.chaye.picturebackend.config.RabbitMQConfig;
 import com.chaye.picturebackend.exception.BusinessException;
 import com.chaye.picturebackend.exception.ErrorCode;
 import com.chaye.picturebackend.exception.ThrowUtils;
 import com.chaye.picturebackend.manager.CosManager;
 import com.chaye.picturebackend.manager.FileManager;
 import com.chaye.picturebackend.manager.upload.FilePictureUpload;
-import com.chaye.picturebackend.config.RabbitMQConfig;
 import com.chaye.picturebackend.manager.upload.PictureUploadTemplate;
 import com.chaye.picturebackend.manager.upload.UrlPictureUpload;
 import com.chaye.picturebackend.mapper.PictureMapper;
@@ -25,20 +25,28 @@ import com.chaye.picturebackend.model.dto.file.UploadPictureResult;
 import com.chaye.picturebackend.model.dto.picture.*;
 import com.chaye.picturebackend.model.entity.Picture;
 import com.chaye.picturebackend.model.entity.Space;
+import com.chaye.picturebackend.model.entity.SpaceUser;
 import com.chaye.picturebackend.model.entity.User;
 import com.chaye.picturebackend.model.enums.PictureReviewStatusEnum;
 import com.chaye.picturebackend.model.vo.PictureVO;
 import com.chaye.picturebackend.model.vo.UserVO;
 import com.chaye.picturebackend.service.PictureService;
 import com.chaye.picturebackend.service.SpaceService;
+import com.chaye.picturebackend.service.SpaceUserService;
 import com.chaye.picturebackend.service.UserService;
 import com.chaye.picturebackend.utils.ColorSimilarUtils;
 import com.chaye.picturebackend.utils.ColorTransformUtils;
+import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.Filter;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,8 +54,6 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import jakarta.annotation.Resource;
-import jakarta.servlet.http.HttpServletRequest;
 import java.awt.*;
 import java.io.IOException;
 import java.util.*;
@@ -90,6 +96,12 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
 
     @Resource
     private RabbitTemplate rabbitTemplate;
+
+    @Resource
+    private VectorStore vectorStore;
+
+    @Resource
+    private SpaceUserService spaceUserService;
 
     @Override
     public void validPicture(Picture picture) {
@@ -220,19 +232,28 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             }
             return picture;
         });
-        
+
         // 发送消息到RabbitMQ，让ImageMqListener处理图片的AI识别和向量存储
-        try {
-            rabbitTemplate.convertAndSend(
-                RabbitMQConfig.IMAGE_EXCHANGE_NAME,
-                RabbitMQConfig.IMAGE_ROUTING_KEY,
-                picture
-            );
-            log.info("图片上传成功，已发送消息到RabbitMQ，图片ID: {}", picture.getId());
-        } catch (Exception e) {
-            log.error("发送RabbitMQ消息失败，图片ID: {}", picture.getId(), e);
+        // 仅私有空间或管理员上传的公共图库图片（自动过审）才立即发送MQ消息
+        // 普通用户上传到公共图库的图片需要等待审核通过后才发送
+        boolean isPrivateSpace = finalSpaceId != null;
+        boolean isAutoApproved = Integer.valueOf(PictureReviewStatusEnum.PASS.getValue()).equals(picture.getReviewStatus());
+
+        if (isPrivateSpace || isAutoApproved) {
+            try {
+                rabbitTemplate.convertAndSend(
+                    RabbitMQConfig.IMAGE_EXCHANGE_NAME,
+                    RabbitMQConfig.IMAGE_ROUTING_KEY,
+                    picture
+                );
+                log.info("图片上传成功，已发送消息到RabbitMQ，图片ID: {}", picture.getId());
+            } catch (Exception e) {
+                log.error("发送RabbitMQ消息失败，图片ID: {}", picture.getId(), e);
+            }
+        } else {
+            log.info("公共图库图片待审核，暂不发送AI识别消息，图片ID: {}", picture.getId());
         }
-        
+
         // todo 可自行实现，如果是更新，可以清理图片资源
         // this.clearPictureFile(oldPicture);
         return PictureVO.objToVo(picture);
@@ -379,6 +400,22 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         updatePicture.setReviewTime(new Date());
         boolean result = this.updateById(updatePicture);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+
+        // 5. 如果是公共图库的图片审核通过，发送MQ消息进行AI识别和向量存储
+        boolean isPublicPicture = oldPicture.getSpaceId() == null;
+        boolean isApproved = PictureReviewStatusEnum.PASS.equals(reviewStatusEnum);
+        if (isPublicPicture && isApproved) {
+            try {
+                rabbitTemplate.convertAndSend(
+                    RabbitMQConfig.IMAGE_EXCHANGE_NAME,
+                    RabbitMQConfig.IMAGE_ROUTING_KEY,
+                    oldPicture
+                );
+                log.info("公共图库图片审核通过，已发送AI识别消息，图片ID: {}", oldPicture.getId());
+            } catch (Exception e) {
+                log.error("发送RabbitMQ消息失败，图片ID: {}", oldPicture.getId(), e);
+            }
+        }
     }
 
     /**
@@ -414,7 +451,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         }
         // 抓取内容
         String fetchUrl = String.format("https://cn.bing.com/images/async?q=%s&mmasync=1", searchText);
-        Document document;
+        org.jsoup.nodes.Document document;
         try {
             document = Jsoup.connect(fetchUrl).get();
         } catch (IOException e) {
@@ -650,6 +687,104 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         createOutPaintingTaskRequest.setParameters(createPictureOutPaintingTaskRequest.getParameters());
         // 创建任务
         return aliYunAiApi.createOutPaintingTask(createOutPaintingTaskRequest);
+    }
+
+    /**
+     * 语义搜索图片
+     * 如果有 spaceId：查询用户加入或拥有的空间中的图片
+     * 如果没有 spaceId：查询公共图库的图片
+     */
+    @Override
+    public List<PictureVO> searchPictureBySemantic(PictureSearchBySemanticRequest searchRequest, User loginUser) {
+        String searchText = searchRequest.getSearchText();
+        Long spaceId = searchRequest.getSpaceId();
+        Integer topK = searchRequest.getTopK();
+        Double similarityThreshold = searchRequest.getSimilarityThreshold();
+
+        // 1. 参数校验
+        if (StrUtil.isBlank(searchText)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "搜索文本不能为空");
+        }
+        ThrowUtils.throwIf(loginUser == null, ErrorCode.NO_AUTH_ERROR);
+
+        // 2. 构建搜索请求（使用 Builder 模式）
+        SearchRequest.Builder requestBuilder = SearchRequest.builder()
+                .query(searchText)
+                .topK(topK != null ? topK : 10)
+                .similarityThreshold(similarityThreshold != null ? similarityThreshold : 0.5);
+
+        // 3. 根据 spaceId 决定搜索范围
+        if (spaceId != null) {
+            // 有 spaceId：校验用户是否有权限访问该空间
+            Space space = spaceService.getById(spaceId);
+            ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR, "空间不存在");
+
+            // 检查用户是否是空间创建者
+            boolean isSpaceOwner = space.getUserId().equals(loginUser.getId());
+            // 检查用户是否是空间成员（团队空间）
+            boolean isSpaceMember = spaceUserService.lambdaQuery()
+                    .eq(SpaceUser::getSpaceId, spaceId)
+                    .eq(SpaceUser::getUserId, loginUser.getId())
+                    .exists();
+
+            // 用户必须是空间创建者或空间成员才能搜索该空间的图片
+            if (!isSpaceOwner && !isSpaceMember) {
+                throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "没有该空间的访问权限");
+            }
+
+            // 添加 spaceId 过滤条件
+            Filter.Expression filterExpression = new FilterExpressionBuilder()
+                    .eq("spaceId", spaceId)
+                    .build();
+            requestBuilder.filterExpression(filterExpression);
+        } else {
+            // 没有 spaceId：查询公共图库（spaceId 为 null 的图片）
+            // 注意：向量数据库过滤 null 值需要特殊处理
+            // 这里使用 spaceId = 0 表示公共图库，与入库时的逻辑保持一致
+            Filter.Expression filterExpression = new FilterExpressionBuilder()
+                    .eq("spaceId", 0L)
+                    .build();
+            requestBuilder.filterExpression(filterExpression);
+        }
+
+        SearchRequest request = requestBuilder.build();
+
+        // 4. 执行向量检索 (查询 PgVector)
+        List<Document> documentList = vectorStore.similaritySearch(request);
+        if (CollUtil.isEmpty(documentList)) {
+            return new ArrayList<>();
+        }
+
+        // 5. 提取图片 ID，保持相似度排序（LinkedHashMap 保证插入顺序）
+        Map<Long, Double> idToScoreMap = new LinkedHashMap<>();
+        for (Document doc : documentList) {
+            Object idObj = doc.getMetadata().get("id");
+            if (idObj != null) {
+                Long pictureId = Long.valueOf(idObj.toString());
+                // 只保留第一次出现的（相似度最高的）
+                if (!idToScoreMap.containsKey(pictureId)) {
+                    Double score = doc.getScore();
+                    idToScoreMap.put(pictureId, score != null ? score : 0.0);
+                }
+            }
+        }
+
+        if (idToScoreMap.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 6. 根据 ID 批量查询 MySQL，构建 ID -> Picture 映射
+        List<Long> pictureIds = new ArrayList<>(idToScoreMap.keySet());
+        List<Picture> pictures = this.listByIds(pictureIds);
+        Map<Long, Picture> idToPictureMap = pictures.stream()
+                .collect(Collectors.toMap(Picture::getId, p -> p));
+
+        // 7. 按相似度顺序组装结果
+        return pictureIds.stream()
+                .map(idToPictureMap::get)
+                .filter(Objects::nonNull)
+                .map(PictureVO::objToVo)
+                .collect(Collectors.toList());
     }
 
     /**

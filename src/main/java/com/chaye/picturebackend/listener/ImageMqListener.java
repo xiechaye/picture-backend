@@ -156,7 +156,7 @@ public class ImageMqListener {
         metadata.put("id", picture.getId());
         metadata.put("url", picture.getUrl());
         metadata.put("name", picture.getName());
-        metadata.put("spaceId", picture.getSpaceId());
+        metadata.put("spaceId", picture.getSpaceId() == null ? 0L : picture.getSpaceId());
         return new Document(description, metadata);
     }
 }

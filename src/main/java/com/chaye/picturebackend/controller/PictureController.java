@@ -417,4 +417,21 @@ public class PictureController {
         GetOutPaintingTaskResponse task = aliYunAiApi.getOutPaintingTask(taskId);
         return ResultUtils.success(task);
     }
+
+    /**
+     * 语义搜索图片
+     * 如果有 spaceId：查询用户加入或拥有的空间中的图片
+     * 如果没有 spaceId：查询公共图库的图片
+     * @param searchRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/search/semantic")
+    public BaseResponse<List<PictureVO>> searchPictureBySemantic(@RequestBody PictureSearchBySemanticRequest searchRequest,
+                                                                  HttpServletRequest request) {
+        ThrowUtils.throwIf(searchRequest == null || searchRequest.getSearchText().isBlank(), ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        List<PictureVO> result = pictureService.searchPictureBySemantic(searchRequest, loginUser);
+        return ResultUtils.success(result);
+    }
 }
