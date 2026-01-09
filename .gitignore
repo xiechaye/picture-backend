@@ -35,3 +35,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Claude code ###
+CLAUDE.md
+settings.local.json
