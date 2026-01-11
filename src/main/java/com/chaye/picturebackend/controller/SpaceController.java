@@ -212,4 +212,14 @@ public class SpaceController {
                 .collect(Collectors.toList());
         return ResultUtils.success(spaceLevelList);
     }
+
+    /**
+     * 获取用户的所有空间（私有空间 + 加入的团队空间）
+     */
+    @GetMapping("/list/my")
+    public BaseResponse<List<SpaceVO>> listMySpaces(HttpServletRequest request) {
+        User loginUser = userService.getLoginUser(request);
+        List<SpaceVO> spaceVOList = spaceService.listMySpaces(loginUser, request);
+        return ResultUtils.success(spaceVOList);
+    }
 }

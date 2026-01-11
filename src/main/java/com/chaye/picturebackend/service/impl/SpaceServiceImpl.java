@@ -245,6 +245,67 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space>
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
     }
+
+    @Override
+    public List<SpaceVO> listMySpaces(User loginUser, HttpServletRequest request) {
+        Long userId = loginUser.getId();
+
+        // 1. 查询用户创建的私有空间（spaceType=0, userId=当前用户ID）
+        List<Space> privateSpaces = this.lambdaQuery()
+                .eq(Space::getUserId, userId)
+                .eq(Space::getSpaceType, SpaceTypeEnum.PRIVATE.getValue())
+                .list();
+
+        // 2. 查询用户加入的团队空间（通过SpaceUser表关联）
+        // 先获取用户加入的所有团队空间的ID
+        List<Long> teamSpaceIds = spaceUserService.lambdaQuery()
+                .eq(SpaceUser::getUserId, userId)
+                .list()
+                .stream()
+                .map(SpaceUser::getSpaceId)
+                .collect(Collectors.toList());
+
+        // 查询这些团队空间的详细信息（只查询团队空间类型）
+        List<Space> teamSpaces = new ArrayList<>();
+        if (CollUtil.isNotEmpty(teamSpaceIds)) {
+            teamSpaces = this.lambdaQuery()
+                    .in(Space::getId, teamSpaceIds)
+                    .eq(Space::getSpaceType, SpaceTypeEnum.TEAM.getValue())
+                    .list();
+        }
+
+        // 3. 合并两个列表
+        List<Space> allSpaces = new ArrayList<>();
+        allSpaces.addAll(privateSpaces);
+        allSpaces.addAll(teamSpaces);
+
+        // 4. 转换为SpaceVO列表
+        if (CollUtil.isEmpty(allSpaces)) {
+            return new ArrayList<>();
+        }
+
+        // 对象列表 => 封装对象列表
+        List<SpaceVO> spaceVOList = allSpaces.stream()
+                .map(SpaceVO::objToVo)
+                .collect(Collectors.toList());
+
+        // 关联查询创建者用户信息
+        Set<Long> userIdSet = allSpaces.stream().map(Space::getUserId).collect(Collectors.toSet());
+        Map<Long, List<User>> userIdUserListMap = userService.listByIds(userIdSet).stream()
+                .collect(Collectors.groupingBy(User::getId));
+
+        // 填充用户信息
+        spaceVOList.forEach(spaceVO -> {
+            Long creatorId = spaceVO.getUserId();
+            User creator = null;
+            if (userIdUserListMap.containsKey(creatorId)) {
+                creator = userIdUserListMap.get(creatorId).get(0);
+            }
+            spaceVO.setUser(userService.getUserVO(creator));
+        });
+
+        return spaceVOList;
+    }
 }
 
 

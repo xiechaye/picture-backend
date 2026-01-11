@@ -10,6 +10,7 @@ import com.chaye.picturebackend.model.entity.User;
 import com.chaye.picturebackend.model.vo.SpaceVO;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
 
 /**
  * @author chaye
@@ -75,4 +76,13 @@ public interface SpaceService extends IService<Space> {
      * @param space
      */
     void checkSpaceAuth(User loginUser, Space space);
+
+    /**
+     * 获取用户的所有空间（私有空间 + 加入的团队空间）
+     *
+     * @param loginUser 当前登录用户
+     * @param request   HTTP请求
+     * @return 空间列表（SpaceVO）
+     */
+    List<SpaceVO> listMySpaces(User loginUser, HttpServletRequest request);
 }
