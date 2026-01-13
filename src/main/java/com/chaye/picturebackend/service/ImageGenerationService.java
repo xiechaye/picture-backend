@@ -5,14 +5,10 @@ import com.chaye.picturebackend.model.dto.imagegeneration.ImageGenerationRespons
 import com.chaye.picturebackend.model.dto.imagegeneration.OptimizePromptRequest;
 import com.chaye.picturebackend.model.dto.imagegeneration.OptimizePromptResponse;
 import com.chaye.picturebackend.model.entity.User;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
 
 /**
  * 图像生成服务
  */
-@Service
-@Slf4j
 public interface ImageGenerationService {
 
     /**

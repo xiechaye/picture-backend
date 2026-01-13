@@ -77,4 +77,53 @@ public class ImageGenerationConfig {
      * 最大 Prompt 长度
      */
     private Integer maxPromptLength = 2000;
+
+    // ========== 工具调用阶段配置 ==========
+
+    /**
+     * 工具调用阶段最大步数
+     * 默认：3
+     * 说明：AI 最多调用 3 次工具后自动进入图像生成阶段
+     */
+    private Integer maxToolCallSteps = 3;
+
+    /**
+     * 是否启用 PromptEnhancerTool
+     * 默认：true
+     */
+    private Boolean usePromptEnhancerTool = true;
+
+    /**
+     * 是否启用 AspectRatioTool
+     * 默认：true
+     */
+    private Boolean useAspectRatioTool = true;
+
+    /**
+     * 是否启用 NegativePromptTool
+     * 默认：true
+     */
+    private Boolean useNegativePromptTool = true;
+
+    /**
+     * Prompt 增强工具的长度阈值
+     * 默认：100
+     * 说明：输入长度 > 此值时，不调用 PromptEnhancerTool
+     */
+    private Integer promptEnhancerThreshold = 100;
+
+    /**
+     * 负面提示词格式模板
+     * 占位符：{prompt} - 优化后的 Prompt
+     *        {negative} - 负面提示词
+     * 默认："{prompt}\n\nAvoid: {negative}"
+     */
+    private String negativePromptFormat = "{prompt}\n\nAvoid: {negative}";
+
+    /**
+     * 是否启用智能尺寸检测
+     * 默认：true
+     * 说明：从用户输入中检测尺寸关键词（如"手机壁纸"），自动调用 AspectRatioTool
+     */
+    private Boolean enableSmartAspectRatio = true;
 }

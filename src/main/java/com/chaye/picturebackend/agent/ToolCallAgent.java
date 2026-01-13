@@ -15,7 +15,7 @@ import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.model.tool.ToolExecutionResult;
-import org.springframework.ai.support.ToolCallbacks;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 
 import java.util.List;
@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 @Data
 public class ToolCallAgent extends ReActAgent{
     // 可调用工具
-    private final ToolCallbacks availableTools;
+    private final ToolCallback[] availableTools;
 
     // 工具调用结果
     private ChatResponse toolCallChatResponse;
@@ -37,8 +37,8 @@ public class ToolCallAgent extends ReActAgent{
     // 工具调用管理器
     private final ToolCallingManager toolCallingManager;
 
-    //  可调用的MCP服务
-    private ToolCallbackProvider toolCallbackProvider;
+//    //  可调用的MCP服务
+//    private ToolCallbackProvider toolCallbackProvider;
 
     // 思考文本
     private String thinkText;
@@ -46,11 +46,11 @@ public class ToolCallAgent extends ReActAgent{
     // 禁用工具自动调用，手动管理上下文
     private ChatOptions chatOptions;
 
-    public ToolCallAgent(ToolCallbacks availableTools, ToolCallbackProvider toolCallbackProvider) {
+    public ToolCallAgent(ToolCallback[] availableTools, ToolCallbackProvider toolCallbackProvider) {
         super();
         // 设置可调用工具
         this.availableTools = availableTools;
-        this.toolCallbackProvider = toolCallbackProvider;
+//        this.toolCallbackProvider = toolCallbackProvider;
         this.toolCallingManager = ToolCallingManager.builder().build();
         // 禁用Spring AI的工具自动调用，自己维护选项消息和上下文
         this.chatOptions = DashScopeChatOptions.builder()
@@ -72,7 +72,7 @@ public class ToolCallAgent extends ReActAgent{
             // 调用ai进行思考，是否需要使用工具
             ChatResponse chatResponse = getChatClient().prompt(prompt)
                     .tools(availableTools)
-                    .tools(toolCallbackProvider)
+//                    .tools(toolCallbackProvider)
                     .call()
                     .chatResponse();
 

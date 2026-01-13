@@ -133,3 +133,37 @@ knife4j:
 #aliYunAi:
 #  model: xxx
 #  apiKey: xxx
+
+## 图像生成 Agent 配置
+agent:
+  image-generation:
+    # 基础配置
+    default-model: wanx-v1
+    default-size: 1024*1024
+    default-image-count: 1
+
+    # 工具调用阶段配置
+    max-tool-call-steps: 3            # 工具调用最大步数
+    use-prompt-enhancer-tool: true    # 启用 Prompt 增强
+    use-aspect-ratio-tool: true       # 启用尺寸推荐
+    use-negative-prompt-tool: true    # 启用负面提示词
+    prompt-enhancer-threshold: 100    # Prompt 增强阈值
+    enable-smart-aspect-ratio: true   # 智能尺寸检测
+    negative-prompt-format: "{prompt}\n\nAvoid: {negative}"  # 负面提示词格式
+
+    # 轮询配置
+    max-polling-retries: 60
+    initial-polling-interval: 1000
+    max-polling-interval: 5000
+    use-exponential-backoff: true
+
+    # 文件上传配置
+    download-timeout: 30000
+    upload-prefix: generated/
+    temp-file-prefix: ai_generated_
+    temp-file-suffix: .png
+
+    # Prompt 长度限制
+    min-prompt-length: 10
+    max-prompt-length: 2000
+

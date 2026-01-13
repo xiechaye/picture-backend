@@ -1,8 +1,17 @@
 package com.chaye.picturebackend.service.impl;
 
+import cn.hutool.core.io.FileUtil;
+import cn.hutool.http.HttpUtil;
+import com.chaye.picturebackend.agent.config.ImageGenerationConfig;
+import com.chaye.picturebackend.api.aliyunai.ImageGenerationApi;
+import com.chaye.picturebackend.api.aliyunai.model.CreateImageTaskRequest;
+import com.chaye.picturebackend.api.aliyunai.model.CreateImageTaskResponse;
+import com.chaye.picturebackend.api.aliyunai.model.GetImageTaskResponse;
 import com.chaye.picturebackend.app.ImageGenerationApp;
+import com.chaye.picturebackend.exception.BusinessException;
 import com.chaye.picturebackend.exception.ErrorCode;
 import com.chaye.picturebackend.exception.ThrowUtils;
+import com.chaye.picturebackend.manager.CosManager;
 import com.chaye.picturebackend.manager.auth.SpaceUserAuthManager;
 import com.chaye.picturebackend.model.dto.imagegeneration.GenerateImageRequest;
 import com.chaye.picturebackend.model.dto.imagegeneration.ImageGenerationResponse;
@@ -10,12 +19,16 @@ import com.chaye.picturebackend.model.dto.imagegeneration.OptimizePromptRequest;
 import com.chaye.picturebackend.model.dto.imagegeneration.OptimizePromptResponse;
 import com.chaye.picturebackend.model.entity.Space;
 import com.chaye.picturebackend.model.entity.User;
+import com.chaye.picturebackend.service.ImageGenerationService;
 import com.chaye.picturebackend.service.SpaceService;
+import com.chaye.picturebackend.tools.AspectRatioTool;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -24,7 +37,7 @@ import java.util.stream.Collectors;
  */
 @Service
 @Slf4j
-public class ImageGenerationServiceImpl {
+public class ImageGenerationServiceImpl implements ImageGenerationService {
 
     @Resource
     private ImageGenerationApp imageGenerationApp;
@@ -35,6 +48,15 @@ public class ImageGenerationServiceImpl {
     @Resource
     private SpaceService spaceService;
 
+    @Resource
+    private ImageGenerationApi imageGenerationApi;  // 阿里云图像生成 API
+
+    @Resource
+    private CosManager cosManager;  // 腾讯云 COS 管理器
+
+    @Resource
+    private ImageGenerationConfig config;  // 配置类
+
     /**
      * 同步生成图像
      *
@@ -43,6 +65,8 @@ public class ImageGenerationServiceImpl {
      * @return 生成结果
      */
     public ImageGenerationResponse generateImage(GenerateImageRequest request, User loginUser) {
+        long totalStartTime = System.currentTimeMillis();
+
         // 1. 参数校验
         ThrowUtils.throwIf(StringUtils.isBlank(request.getPrompt()),
                 ErrorCode.PARAMS_ERROR, "图像描述不能为空");
@@ -52,23 +76,59 @@ public class ImageGenerationServiceImpl {
         // 2. 校验空间权限
         validateSpaceAccess(request.getSpaceId(), loginUser);
 
-        log.info("用户{}开始同步生成图像，spaceId={}, prompt={}",
+        log.info("用户 {} 开始同步生成图像，spaceId={}, prompt={}",
                 loginUser.getId(), request.getSpaceId(), request.getPrompt());
 
-        // 3. 调用App生成并阻塞等待
-        ImageGenerationApp.ImageGenerationResult result =
-                imageGenerationApp.generateImageWithResult(request.getPrompt());
+        // ========== 阶段 1: Agent 参数优化 ==========
+        ImageGenerationApp.ParameterOptimizationResult optimization =
+                imageGenerationApp.optimizeParameters(request.getPrompt());
 
-        // 4. 转换为响应DTO
+        log.info("参数优化完成，耗时: {}ms, optimizedPrompt 长度: {}, size: {}, hasNegative: {}",
+                optimization.optimizationTime(),
+                optimization.optimizedPrompt().length(),
+                optimization.recommendedSize(),
+                optimization.negativePrompt() != null);
+
+        // ========== 阶段 2: 构建最终 Prompt ==========
+        String finalPrompt = buildFinalPrompt(
+                optimization.optimizedPrompt(),
+                optimization.negativePrompt()
+        );
+
+        // ========== 阶段 3: 创建图像生成任务 ==========
+        CreateImageTaskResponse createResponse = createImageGenerationTask(
+                finalPrompt,
+                optimization.recommendedSize()
+        );
+        String taskId = createResponse.getOutput().getTaskId();
+
+        log.info("图像生成任务创建成功，taskId: {}", taskId);
+
+        // ========== 阶段 4: 轮询任务状态 ==========
+        GetImageTaskResponse taskResponse = pollTaskStatus(taskId);
+        List<GetImageTaskResponse.ImageResult> results = taskResponse.getOutput().getResults();
+
+        ThrowUtils.throwIf(results == null || results.isEmpty(),
+                ErrorCode.OPERATION_ERROR, "图像生成失败：未返回结果");
+
+        String imageUrl = results.get(0).getUrl();
+        log.info("图像生成成功，imageUrl: {}", imageUrl);
+
+        // ========== 阶段 5: 下载并上传到 COS ==========
+        String cosKey = downloadAndUploadImage(imageUrl);
+
+        long totalTime = System.currentTimeMillis() - totalStartTime;
+
+        log.info("用户 {} 图像生成完成，总耗时: {}ms, cosKey: {}",
+                loginUser.getId(), totalTime, cosKey);
+
+        // ========== 构建响应 ==========
         ImageGenerationResponse response = new ImageGenerationResponse();
-        response.setImageUrl(result.imageUrl());
-        response.setCosKey(result.cosKey());
-        response.setOptimizedPrompt(result.optimizedPrompt());
-        response.setTotalTime(result.totalTime());
+        response.setImageUrl(imageUrl);
+        response.setCosKey(cosKey);
+        response.setOptimizedPrompt(optimization.optimizedPrompt());
+        response.setTotalTime(totalTime);
         response.setSpaceId(request.getSpaceId());
-
-        log.info("用户{}图像生成成功，耗时{}ms, cosKey={}",
-                loginUser.getId(), result.totalTime(), result.cosKey());
 
         return response;
     }
@@ -122,5 +182,150 @@ public class ImageGenerationServiceImpl {
         ThrowUtils.throwIf(permissions.isEmpty(), ErrorCode.NO_AUTH_ERROR, "无权限访问该空间");
 
         log.info("用户{}通过空间{}权限校验", loginUser.getId(), spaceId);
+    }
+
+    /**
+     * 构建最终 Prompt（合并负面提示词）
+     *
+     * @param prompt         优化后的 Prompt
+     * @param negativePrompt 负面提示词（可为 null）
+     * @return 最终 Prompt
+     */
+    private String buildFinalPrompt(String prompt, String negativePrompt) {
+        if (negativePrompt != null && !negativePrompt.isBlank()) {
+            // 使用配置的格式合并
+            String format = config.getNegativePromptFormat();
+            return format.replace("{prompt}", prompt)
+                    .replace("{negative}", negativePrompt.trim());
+        }
+        return prompt;
+    }
+
+    /**
+     * 创建图像生成任务
+     *
+     * @param finalPrompt     最终 Prompt
+     * @param recommendedSize 推荐尺寸（格式："width,height"，可为 null）
+     * @return 任务创建响应
+     */
+    private CreateImageTaskResponse createImageGenerationTask(String finalPrompt, String recommendedSize) {
+        CreateImageTaskRequest request = new CreateImageTaskRequest();
+        request.setModel(config.getDefaultModel());
+
+        CreateImageTaskRequest.Input input = new CreateImageTaskRequest.Input();
+        input.setPrompt(finalPrompt);
+        request.setInput(input);
+
+        CreateImageTaskRequest.Parameters parameters = new CreateImageTaskRequest.Parameters();
+
+        // 处理尺寸参数
+        String apiSize;
+        if (recommendedSize != null && !recommendedSize.isBlank()) {
+            // 转换格式：从 "width,height" 到 "width*height"
+            apiSize = AspectRatioTool.convertToApiFormat(recommendedSize.trim());
+            log.info("使用推荐尺寸: {}", apiSize);
+        } else {
+            apiSize = config.getDefaultSize();
+            log.info("使用默认尺寸: {}", apiSize);
+        }
+
+        parameters.setSize(apiSize);
+        parameters.setN(config.getDefaultImageCount());
+
+        request.setParameters(parameters);
+
+        return imageGenerationApi.createImageTask(request);
+    }
+
+    /**
+     * 轮询查询任务状态（支持指数退避策略）
+     *
+     * @param taskId 任务 ID
+     * @return 任务响应
+     */
+    private GetImageTaskResponse pollTaskStatus(String taskId) {
+        int maxRetries = config.getMaxPollingRetries();
+        long currentInterval = config.getInitialPollingInterval();
+        int retryCount = 0;
+
+        while (retryCount < maxRetries) {
+            try {
+                GetImageTaskResponse taskResponse = imageGenerationApi.getImageTask(taskId);
+                String taskStatus = taskResponse.getOutput().getTaskStatus();
+
+                log.info("任务状态: {} (执行 {}/{})", taskStatus, retryCount + 1, maxRetries);
+
+                if ("SUCCEEDED".equals(taskStatus)) {
+                    return taskResponse;
+                } else if ("FAILED".equals(taskStatus)) {
+                    String errorMessage = taskResponse.getOutput().getMessage();
+                    throw new BusinessException(ErrorCode.OPERATION_ERROR,
+                            "图像生成任务失败: " + errorMessage);
+                }
+
+                // 等待后重试
+                Thread.sleep(currentInterval);
+
+                // 指数退避策略
+                if (config.getUseExponentialBackoff()) {
+                    currentInterval = Math.min(
+                            currentInterval * 2,
+                            config.getMaxPollingInterval()
+                    );
+                }
+
+                retryCount++;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "轮询任务状态被中断");
+            }
+        }
+
+        throw new BusinessException(ErrorCode.OPERATION_ERROR,
+                String.format("图像生成超时（已重试 %d 次）", maxRetries));
+    }
+
+    /**
+     * 下载图像并上传到 COS
+     *
+     * @param imageUrl 阿里云图像 URL
+     * @return COS 存储路径
+     */
+    private String downloadAndUploadImage(String imageUrl) {
+        File tempFile = null;
+        try {
+            // 下载图像到临时文件
+            tempFile = File.createTempFile(
+                    config.getTempFilePrefix(),
+                    config.getTempFileSuffix()
+            );
+            HttpUtil.downloadFile(imageUrl, tempFile);
+
+            log.info("图像已下载到临时文件: {}", tempFile.getAbsolutePath());
+
+            // 生成唯一的文件名
+            String fileName = config.getTempFilePrefix()
+                    + UUID.randomUUID()
+                    + config.getTempFileSuffix();
+            String cosKey = config.getUploadPrefix() + fileName;
+
+            // 上传到 COS
+            cosManager.putPictureObject(cosKey, tempFile);
+
+            log.info("图像已上传到 COS: {}", cosKey);
+
+            return cosKey;
+
+        } catch (Exception e) {
+            log.error("下载或上传图像失败: {}", e.getMessage(), e);
+            throw new BusinessException(ErrorCode.OPERATION_ERROR,
+                    "下载或上传图像失败: " + e.getMessage());
+        } finally {
+            // 清理临时文件
+            if (tempFile != null && tempFile.exists()) {
+                FileUtil.del(tempFile);
+                log.debug("临时文件已删除");
+            }
+        }
     }
 }

@@ -18,7 +18,6 @@ import java.io.IOException;
  *
  * @author chaye
  */
-@Component
 public class ResourceDownloadTool {
 
     @Resource
