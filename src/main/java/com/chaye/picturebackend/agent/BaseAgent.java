@@ -109,11 +109,9 @@ public abstract class BaseAgent {
         this.currentStep = 0;
 
         // 清理运行时数据
-        this.nextStepPrompt = "";
+        // 注意：不清空 systemPrompt 和 nextStepPrompt，因为它们是配置性数据，在构造函数中设置
 
         // 清理消息列表（重新初始化而不是设为null，避免NPE）
         this.messageList = new ArrayList<>();
-
-        // 注意：不清理 systemPrompt，因为它是配置性数据，在构造函数中设置
     }
 }

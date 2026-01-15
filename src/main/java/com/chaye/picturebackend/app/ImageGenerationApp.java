@@ -4,7 +4,7 @@ import com.chaye.picturebackend.advisor.MyLoggerAdvisor;
 import com.chaye.picturebackend.advisor.ReReadingAdvisor;
 import com.chaye.picturebackend.agent.ImageGenerationAgent;
 import com.chaye.picturebackend.agent.context.ImageGenerationContext;
-import jakarta.annotation.Resource;
+import com.chaye.picturebackend.tools.ToolNames;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
@@ -14,6 +14,7 @@ import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
@@ -26,9 +27,11 @@ public class ImageGenerationApp {
 
     private final ChatClient chatClient;
 
-    // ImageGenerationAgent 实例
-    @Resource
-    private ImageGenerationAgent imageGenerationAgent;
+    /**
+     * ImageGenerationAgent 提供者，用于获取原型作用域的 Agent 实例
+     * 每次调用 getObject() 都会创建新实例，避免并发问题
+     */
+    private final ObjectProvider<ImageGenerationAgent> agentProvider;
 
 
     private static final String SYSTEM_PROMPT = "You are a professional AI image generation assistant. Your task is to help users generate high-quality images. " +
@@ -38,7 +41,10 @@ public class ImageGenerationApp {
             "3. Call the image generation service to create images " +
             "4. Return the generated image URL and related information";
 
-    public ImageGenerationApp(ChatModel dashscopeChatModel) {
+    public ImageGenerationApp(ChatModel dashscopeChatModel,
+                               ObjectProvider<ImageGenerationAgent> agentProvider) {
+        this.agentProvider = agentProvider;
+
         // 初始化基于文件的聊天记忆
         String fileDir = System.getProperty("user.dir") + "/tmp/chat-memory";
         // 基于文件的持久化存储
@@ -104,15 +110,18 @@ public class ImageGenerationApp {
     public ParameterOptimizationResult optimizeParameters(String userPrompt) {
         long startTime = System.currentTimeMillis();
 
+        // 每次调用获取新的 Agent 实例，避免并发问题
+        ImageGenerationAgent agent = agentProvider.getObject();
+
         try {
             // 收集 Agent 执行的所有步骤输出
             java.util.List<String> outputs = new java.util.ArrayList<>();
-            imageGenerationAgent.run(userPrompt)
+            agent.run(userPrompt)
                     .doOnNext(outputs::add)
                     .blockLast();
 
             // 检查是否发生错误
-            if (imageGenerationAgent.getAgentEnum() == com.chaye.picturebackend.model.enums.AgentEnum.ERROR) {
+            if (agent.getAgentEnum() == com.chaye.picturebackend.model.enums.AgentEnum.ERROR) {
                 log.warn("Agent 优化失败，使用原始 Prompt");
                 return new ParameterOptimizationResult(
                         userPrompt,  // 使用原始输入
@@ -123,7 +132,7 @@ public class ImageGenerationApp {
             }
 
             // 从 Agent 的上下文中提取优化结果
-            ImageGenerationContext context = extractOptimizationContext();
+            ImageGenerationContext context = extractOptimizationContext(agent);
 
             long optimizationTime = System.currentTimeMillis() - startTime;
 
@@ -155,13 +164,14 @@ public class ImageGenerationApp {
     /**
      * 从 Agent 的 messageList 中提取优化上下文
      *
+     * @param agent Agent 实例
      * @return 优化上下文
      */
-    private ImageGenerationContext extractOptimizationContext() {
+    private ImageGenerationContext extractOptimizationContext(ImageGenerationAgent agent) {
         ImageGenerationContext context = new ImageGenerationContext();
 
         // 从 Agent 的 messageList 中获取 ToolResponseMessage
-        java.util.List<Message> messageList = imageGenerationAgent.getMessageList();
+        java.util.List<Message> messageList = agent.getMessageList();
 
         for (Message message : messageList) {
             if (message instanceof ToolResponseMessage toolResponseMessage) {
@@ -170,15 +180,15 @@ public class ImageGenerationApp {
                     String toolOutput = response.responseData();  // 工具返回值
 
                     switch (toolName) {
-                        case "enhancePrompt":
+                        case ToolNames.ENHANCE_PROMPT:
                             context.setOptimizedPrompt(toolOutput);
                             log.debug("提取到增强的 Prompt，长度: {}", toolOutput.length());
                             break;
-                        case "recommendSize":
+                        case ToolNames.RECOMMEND_SIZE:
                             context.setRecommendedSize(toolOutput);
                             log.debug("提取到推荐尺寸: {}", toolOutput);
                             break;
-                        case "generateNegativePrompt":
+                        case ToolNames.GENERATE_NEGATIVE_PROMPT:
                             context.setNegativePrompt(toolOutput);
                             log.debug("提取到负面提示词，长度: {}", toolOutput.length());
                             break;
@@ -198,15 +208,18 @@ public class ImageGenerationApp {
      */
     @Deprecated
     public ImageGenerationResult generateImageWithResult(String userPrompt) {
+        // 每次调用获取新的 Agent 实例
+        ImageGenerationAgent agent = agentProvider.getObject();
+
         try {
             // 收集 Agent 执行的所有步骤输出
             java.util.List<String> outputs = new java.util.ArrayList<>();
-            imageGenerationAgent.run(userPrompt)
+            agent.run(userPrompt)
                     .doOnNext(outputs::add)
                     .blockLast();
 
             // 检查是否发生错误
-            if (imageGenerationAgent.getAgentEnum() == com.chaye.picturebackend.model.enums.AgentEnum.ERROR) {
+            if (agent.getAgentEnum() == com.chaye.picturebackend.model.enums.AgentEnum.ERROR) {
                 throw new RuntimeException("Image generation failed");
             }
 

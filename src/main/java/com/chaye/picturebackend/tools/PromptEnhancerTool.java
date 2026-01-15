@@ -1,6 +1,5 @@
 package com.chaye.picturebackend.tools;
 
-import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.tool.annotation.Tool;
@@ -17,8 +16,16 @@ import org.springframework.ai.tool.annotation.ToolParam;
 @Slf4j
 public class PromptEnhancerTool {
 
-    @Resource
-    private ChatClient chatClient;
+    private final ChatClient chatClient;
+
+    /**
+     * 构造函数，通过参数注入 ChatClient
+     *
+     * @param chatClient Spring AI ChatClient 实例
+     */
+    public PromptEnhancerTool(ChatClient chatClient) {
+        this.chatClient = chatClient;
+    }
 
     /**
      * 细节关键词列表

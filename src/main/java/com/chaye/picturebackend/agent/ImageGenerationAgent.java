@@ -6,6 +6,8 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.config.ConfigurableBeanFactory;
+import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
 /**
@@ -22,9 +24,12 @@ import org.springframework.stereotype.Component;
  * - generateNegativePrompt：生成负面提示词以提升质量
  * - generateAndUpload：生成图像并上传到 COS（核心工具）
  * - doTerminate：完成任务
+ *
+ * 注意：使用原型作用域，每次请求创建新实例，避免并发问题
  */
 @Slf4j
 @Component
+@Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
 public class ImageGenerationAgent extends ToolCallAgent {
 
     public ImageGenerationAgent(ChatModel dashscopeChatModel,
