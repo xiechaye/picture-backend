@@ -2,12 +2,12 @@ package com.chaye.picturebackend.service.impl;
 
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.http.HttpUtil;
+import com.chaye.picturebackend.agent.ImagePromptOptimizerManus;
 import com.chaye.picturebackend.agent.config.ImageGenerationConfig;
 import com.chaye.picturebackend.api.aliyunai.ImageGenerationApi;
 import com.chaye.picturebackend.api.aliyunai.model.CreateImageTaskRequest;
 import com.chaye.picturebackend.api.aliyunai.model.CreateImageTaskResponse;
 import com.chaye.picturebackend.api.aliyunai.model.GetImageTaskResponse;
-import com.chaye.picturebackend.app.ImagePromptOptimizerApp;
 import com.chaye.picturebackend.exception.BusinessException;
 import com.chaye.picturebackend.exception.ErrorCode;
 import com.chaye.picturebackend.exception.ThrowUtils;
@@ -22,9 +22,11 @@ import com.chaye.picturebackend.model.entity.User;
 import com.chaye.picturebackend.service.ImageGenerationService;
 import com.chaye.picturebackend.service.SpaceService;
 import com.chaye.picturebackend.tools.AspectRatioTool;
-import jakarta.annotation.Resource;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -36,25 +38,22 @@ import java.util.UUID;
  */
 @Service
 @Slf4j
+@AllArgsConstructor
 public class ImageGenerationServiceImpl implements ImageGenerationService {
 
-    @Resource
-    private ImagePromptOptimizerApp imagePromptOptimizerApp;
+    private final ChatModel dashscopeChatModel;
 
-    @Resource
-    private SpaceUserAuthManager spaceUserAuthManager;
+    private final ToolCallback[] allTools;
 
-    @Resource
-    private SpaceService spaceService;
+    private final SpaceService spaceService;
 
-    @Resource
-    private ImageGenerationApi imageGenerationApi;  // 阿里云图像生成 API
+    private final SpaceUserAuthManager spaceUserAuthManager;
 
-    @Resource
-    private CosManager cosManager;  // 腾讯云 COS 管理器
+    private final ImageGenerationApi imageGenerationApi;  // 阿里云图像生成 API
 
-    @Resource
-    private ImageGenerationConfig config;  // 配置类
+    private final CosManager cosManager;  // 腾讯云 COS 管理器
+
+    private final ImageGenerationConfig config;  // 配置类
 
     /**
      * 同步生成图像
@@ -139,24 +138,44 @@ public class ImageGenerationServiceImpl implements ImageGenerationService {
 
         log.info("开始优化Prompt: {}", request.getPrompt());
 
-        // 使用 Agent 优化（智能调用工具）
-        ImagePromptOptimizerApp.ParameterOptimizationResult optimization =
-                imagePromptOptimizerApp.optimizeParameters(request.getPrompt());
+        long startTime = System.currentTimeMillis();
 
+        // 创建 Agent 并执行优化
+        ImagePromptOptimizerManus imagePromptOptimizerManus = new ImagePromptOptimizerManus(dashscopeChatModel, allTools);
+        imagePromptOptimizerManus.run(request.getPrompt());  // 执行优化流程
+
+        // 提取所有优化结果
+        String optimizedPrompt = imagePromptOptimizerManus.getOptimizedPrompt();
+        String recommendedSize = imagePromptOptimizerManus.getRecommendedSize();
+        String negativePrompt = imagePromptOptimizerManus.getNegativePrompt();
+
+        // 如果没有获取到优化结果，使用原始输入
+        if (optimizedPrompt == null || optimizedPrompt.isEmpty()) {
+            log.warn("未获取到优化结果，使用原始输入");
+            optimizedPrompt = request.getPrompt();
+        }
+
+        long optimizationTime = System.currentTimeMillis() - startTime;
+
+        // 返回完整的优化结果
         OptimizePromptResponse response = new OptimizePromptResponse();
         response.setOriginalPrompt(request.getPrompt());
-        response.setOptimizedPrompt(optimization.optimizedPrompt());
+        response.setOptimizedPrompt(optimizedPrompt);
+        response.setRecommendedSize(recommendedSize);  // 新增
+        response.setNegativePrompt(negativePrompt);    // 新增
 
-        // 可选：返回额外的优化信息
-        if (optimization.recommendedSize() != null) {
-            response.setRecommendedSize(optimization.recommendedSize());
-        }
-        if (optimization.negativePrompt() != null) {
-            response.setNegativePrompt(optimization.negativePrompt());
-        }
+        log.info("Prompt优化完成，长度: {} -> {}, 耗时: {}ms",
+                request.getPrompt().length(),
+                optimizedPrompt.length(),
+                optimizationTime);
 
-        log.info("Prompt优化完成，长度: {} -> {}",
-                request.getPrompt().length(), optimization.optimizedPrompt().length());
+        // 输出详细的优化结果
+        if (recommendedSize != null) {
+            log.info("推荐尺寸: {}", recommendedSize);
+        }
+        if (negativePrompt != null) {
+            log.info("负面提示词: {}", negativePrompt);
+        }
 
         return response;
     }

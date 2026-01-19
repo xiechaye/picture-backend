@@ -20,5 +20,15 @@ public class OptimizePromptResponse implements Serializable {
      */
     private String optimizedPrompt;
 
+    /**
+     * 推荐尺寸（可选，格式："width,height"）
+     */
+    private String recommendedSize;
+
+    /**
+     * 负面提示词（可选）
+     */
+    private String negativePrompt;
+
     private static final long serialVersionUID = 1L;
 }

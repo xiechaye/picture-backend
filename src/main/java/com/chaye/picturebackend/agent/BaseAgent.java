@@ -3,12 +3,10 @@ package com.chaye.picturebackend.agent;
 import com.chaye.picturebackend.model.enums.AgentEnum;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
+import org.jsoup.internal.StringUtil;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Sinks;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,58 +38,47 @@ public abstract class BaseAgent {
     private List<Message> messageList = new ArrayList<>();
 
     /**
-     * 运行智能体并返回Flux流
+     * 运行智能体
      * @param userPrompt 用户输入的提示词
-     * @return 执行结果的Flux流
+     * @return 执行结果
      */
-    public Flux<String> run(String userPrompt) {
-        return Flux.create(sink -> {
-            // 检查智能体是否空闲
-            if(agentEnum != AgentEnum.IDLE) {
-                sink.next("Error: Cannot run agent from state: " + agentEnum);
-                sink.complete();
-                return;
+    public String run(String userPrompt) {
+        if (this.agentEnum != AgentEnum.IDLE) {
+            throw new RuntimeException("Cannot run agent from agentEnum: " + this.agentEnum);
+        }
+        if (StringUtil.isBlank(userPrompt)) {
+            throw new RuntimeException("Cannot run agent with empty user prompt");
+        }
+        // 更改状态  
+        agentEnum = AgentEnum.RUNNING;
+        // 记录消息上下文  
+        messageList.add(new UserMessage(userPrompt));
+        // 保存结果列表  
+        List<String> results = new ArrayList<>();
+        try {
+            for (int i = 0; i < maxStep && agentEnum != AgentEnum.FINISHED; i++) {
+                int stepNumber = i + 1;
+                currentStep = stepNumber;
+                log.info("Executing step " + stepNumber + "/" + maxStep);
+                // 单步执行  
+                String stepResult = step();
+                String result = "Step " + stepNumber + ": " + stepResult;
+                results.add(result);
             }
-
-            // 检查用户提示词是否为空
-            if(StringUtils.isBlank(userPrompt)) {
-                sink.next("Error: Cannot run agent with empty prompt.");
-                sink.complete();
-                return;
+            // 检查是否超出步骤限制  
+            if (currentStep >= maxStep) {
+                agentEnum = AgentEnum.FINISHED;
+                results.add("Terminated: Reached max steps (" + maxStep + ")");
             }
-
-            // 将用户消息添加到上下文
-            messageList.add(new UserMessage(userPrompt));
-
-            // 设置状态为运行中
-            agentEnum = AgentEnum.RUNNING;
-
-            try {
-                while(currentStep < maxStep && agentEnum != AgentEnum.FINISHED) {
-                    currentStep += 1;
-                    log.info("Executing step: " + currentStep + "/" + maxStep);
-                    String result = step();
-                    log.info("Step result: " + result);
-
-                    // 为每个步骤发出结果
-                    sink.next(result);
-                }
-
-                // 达到最大步数
-                if(currentStep >= maxStep) {
-                    agentEnum = AgentEnum.FINISHED;
-                    sink.next("Terminated: Reached max steps (" + maxStep + ")");
-                }
-
-                sink.complete();
-            } catch (Exception e) {
-                agentEnum = AgentEnum.ERROR;
-                log.error("Error during agent execution", e);
-                sink.error(e);
-            } finally {
-                cleanup();
-            }
-        });
+            return String.join("\n", results);
+        } catch (Exception e) {
+            agentEnum = AgentEnum.ERROR;
+            log.error("Error executing agent", e);
+            return "执行错误" + e.getMessage();
+        } finally {
+            // 清理资源  
+            this.cleanup();
+        }
     }
 
     /**

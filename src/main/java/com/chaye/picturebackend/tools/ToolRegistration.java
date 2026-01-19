@@ -15,22 +15,26 @@ import org.springframework.context.annotation.Configuration;
 public class ToolRegistration {
 
     /**
-     * 注册图像生成专用工具
-     * 根据配置动态注册工具
+     * 注册图像 Prompt 优化专用工具
+     * 直接返回工具对象数组，由 Spring AI 自动识别 @Tool 注解
      *
      * @param chatClientBuilder ChatClient 构建器，用于创建 PromptEnhancerTool 所需的 ChatClient
-     * @return 图像生成工具回调集合
+     * @return 图像 Prompt 优化工具对象数组
      */
-    @Bean("imageGenerationTools")
-    public ToolCallback[] imageGenerationTools(ChatClient.Builder chatClientBuilder) {
+    @Bean
+    public ToolCallback[] allTools(ChatClient.Builder chatClientBuilder) {
         // 构建 ChatClient 用于 PromptEnhancerTool
         ChatClient chatClient = chatClientBuilder.build();
 
-        // 使用 ToolCallbacks.from() 创建 ToolCallback 数组
         AspectRatioTool aspectRatioTool = new AspectRatioTool();
         NegativePromptTool negativePromptTool = new NegativePromptTool();
         PromptEnhancerTool promptEnhancerTool = new PromptEnhancerTool(chatClient);
-        return ToolCallbacks.from(aspectRatioTool, negativePromptTool, promptEnhancerTool);
+        TerminateTool terminateTool = new TerminateTool();
+
+        return ToolCallbacks.from(aspectRatioTool,
+                negativePromptTool,
+                promptEnhancerTool,
+                terminateTool);
     }
 
 }
