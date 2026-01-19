@@ -7,7 +7,7 @@ import com.chaye.picturebackend.api.aliyunai.ImageGenerationApi;
 import com.chaye.picturebackend.api.aliyunai.model.CreateImageTaskRequest;
 import com.chaye.picturebackend.api.aliyunai.model.CreateImageTaskResponse;
 import com.chaye.picturebackend.api.aliyunai.model.GetImageTaskResponse;
-import com.chaye.picturebackend.app.ImageGenerationApp;
+import com.chaye.picturebackend.app.ImagePromptOptimizerApp;
 import com.chaye.picturebackend.exception.BusinessException;
 import com.chaye.picturebackend.exception.ErrorCode;
 import com.chaye.picturebackend.exception.ThrowUtils;
@@ -30,7 +30,6 @@ import org.springframework.stereotype.Service;
 import java.io.File;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * 图像生成服务
@@ -40,7 +39,7 @@ import java.util.stream.Collectors;
 public class ImageGenerationServiceImpl implements ImageGenerationService {
 
     @Resource
-    private ImageGenerationApp imageGenerationApp;
+    private ImagePromptOptimizerApp imagePromptOptimizerApp;
 
     @Resource
     private SpaceUserAuthManager spaceUserAuthManager;
@@ -79,32 +78,26 @@ public class ImageGenerationServiceImpl implements ImageGenerationService {
         log.info("用户 {} 开始同步生成图像，spaceId={}, prompt={}",
                 loginUser.getId(), request.getSpaceId(), request.getPrompt());
 
-        // ========== 阶段 1: Agent 参数优化 ==========
-        ImageGenerationApp.ParameterOptimizationResult optimization =
-                imageGenerationApp.optimizeParameters(request.getPrompt());
+        //  移除 Agent 优化，直接使用用户提供的参数
 
-        log.info("参数优化完成，耗时: {}ms, optimizedPrompt 长度: {}, size: {}, hasNegative: {}",
-                optimization.optimizationTime(),
-                optimization.optimizedPrompt().length(),
-                optimization.recommendedSize(),
-                optimization.negativePrompt() != null);
+        // 构建最终 Prompt（如果用户提供了负面提示词，则合并）
+        String finalPrompt = request.getPrompt();
+        if (StringUtils.isNotBlank(request.getNegativePrompt())) {
+            finalPrompt = buildFinalPrompt(request.getPrompt(), request.getNegativePrompt());
+        }
 
-        // ========== 阶段 2: 构建最终 Prompt ==========
-        String finalPrompt = buildFinalPrompt(
-                optimization.optimizedPrompt(),
-                optimization.negativePrompt()
-        );
+        // 使用用户提供的尺寸，如果没有则使用默认尺寸
+        String size = StringUtils.isNotBlank(request.getSize())
+                ? request.getSize()
+                : null;
 
-        // ========== 阶段 3: 创建图像生成任务 ==========
-        CreateImageTaskResponse createResponse = createImageGenerationTask(
-                finalPrompt,
-                optimization.recommendedSize()
-        );
+        // 创建图像生成任务
+        CreateImageTaskResponse createResponse = createImageGenerationTask(finalPrompt, size);
         String taskId = createResponse.getOutput().getTaskId();
 
         log.info("图像生成任务创建成功，taskId: {}", taskId);
 
-        // ========== 阶段 4: 轮询任务状态 ==========
+        // 轮询任务状态
         GetImageTaskResponse taskResponse = pollTaskStatus(taskId);
         List<GetImageTaskResponse.ImageResult> results = taskResponse.getOutput().getResults();
 
@@ -114,7 +107,7 @@ public class ImageGenerationServiceImpl implements ImageGenerationService {
         String imageUrl = results.get(0).getUrl();
         log.info("图像生成成功，imageUrl: {}", imageUrl);
 
-        // ========== 阶段 5: 下载并上传到 COS ==========
+        // 下载并上传到 COS
         String cosKey = downloadAndUploadImage(imageUrl);
 
         long totalTime = System.currentTimeMillis() - totalStartTime;
@@ -122,11 +115,11 @@ public class ImageGenerationServiceImpl implements ImageGenerationService {
         log.info("用户 {} 图像生成完成，总耗时: {}ms, cosKey: {}",
                 loginUser.getId(), totalTime, cosKey);
 
-        // ========== 构建响应 ==========
+        // 构建响应
         ImageGenerationResponse response = new ImageGenerationResponse();
         response.setImageUrl(imageUrl);
         response.setCosKey(cosKey);
-        response.setOptimizedPrompt(optimization.optimizedPrompt());
+        response.setOptimizedPrompt(request.getPrompt()); // 返回用户使用的 prompt
         response.setTotalTime(totalTime);
         response.setSpaceId(request.getSpaceId());
 
@@ -146,20 +139,24 @@ public class ImageGenerationServiceImpl implements ImageGenerationService {
 
         log.info("开始优化Prompt: {}", request.getPrompt());
 
-        // 使用ChatClient优化（不需要空间权限）
-        String chatId = UUID.randomUUID().toString();
-        String optimized = imageGenerationApp.optimizeImagePrompt(chatId, request.getPrompt())
-                .collectList()
-                .block()
-                .stream()
-                .collect(Collectors.joining());
+        // 使用 Agent 优化（智能调用工具）
+        ImagePromptOptimizerApp.ParameterOptimizationResult optimization =
+                imagePromptOptimizerApp.optimizeParameters(request.getPrompt());
 
         OptimizePromptResponse response = new OptimizePromptResponse();
         response.setOriginalPrompt(request.getPrompt());
-        response.setOptimizedPrompt(optimized);
+        response.setOptimizedPrompt(optimization.optimizedPrompt());
+
+        // 可选：返回额外的优化信息
+        if (optimization.recommendedSize() != null) {
+            response.setRecommendedSize(optimization.recommendedSize());
+        }
+        if (optimization.negativePrompt() != null) {
+            response.setNegativePrompt(optimization.negativePrompt());
+        }
 
         log.info("Prompt优化完成，长度: {} -> {}",
-                request.getPrompt().length(), optimized.length());
+                request.getPrompt().length(), optimization.optimizedPrompt().length());
 
         return response;
     }
