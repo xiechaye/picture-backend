@@ -64,9 +64,10 @@ public class PromptEnhancerTool {
      */
     @Tool(description = """
         Enhance a simple image description into a detailed, high-quality AI image generation prompt.
+        IMPORTANT: Output language MUST match input language (Chinese input -> Chinese output, English input -> English output).
 
         WHEN TO USE:
-        - User provides a brief or vague description (e.g., "a cat", "sunset", "mountain")
+        - User provides a brief or vague description (e.g., "a cat", "sunset", "一只猫", "日落")
         - User's input lacks visual details (colors, lighting, style, composition, quality indicators)
         - User explicitly asks to "optimize", "improve", or "enhance" the prompt
         - Input is simple and straightforward without technical terminology
@@ -78,21 +79,22 @@ public class PromptEnhancerTool {
 
         HOW IT WORKS:
         This tool uses AI to transform simple descriptions into professional image generation prompts
-        optimized for Stable Diffusion/DALL-E models.
+        optimized for AI image generation models. The output language matches the input language.
 
         OUTPUT:
-        A detailed English prompt including:
+        A detailed prompt in the SAME LANGUAGE as the input, including:
         - Rich visual details (colors, textures, mood)
         - Artistic style and technique
         - Lighting and composition
         - Quality indicators (8k, professional, detailed, etc.)
 
-        EXAMPLE:
+        EXAMPLE (Chinese input -> Chinese output):
         Input: "一只猫"
-        Output: "A fluffy orange tabby cat with bright green eyes, sitting gracefully on a wooden windowsill.
-                 Soft golden hour sunlight streaming through the window, creating a warm bokeh effect in the background.
-                 Professional pet photography style, high detail, 8K resolution."
+        Output: "一只毛茸茸的橘色虎斑猫，拥有明亮的绿色眼睛，优雅地坐在木质窗台上。
+                 柔和的黄金时刻阳光透过窗户洒入，在背景中营造出温暖的散景效果。
+                 专业宠物摄影风格，高细节，8K分辨率。"
 
+        EXAMPLE (English input -> English output):
         Input: "sunset"
         Output: "A breathtaking sunset over a calm ocean, vibrant orange and pink hues painting the sky.
                  Wispy clouds catching the golden light, gentle waves reflecting the colors.
@@ -129,7 +131,10 @@ public class PromptEnhancerTool {
                 3. Composition guidance: Specify perspective, angle, foreground/background elements
                 4. Quality indicators: Add terms like "high detail", "8K resolution", "professional photography"
                 5. Concise yet descriptive: Keep it between 50-150 words, focused and impactful
-                6. Output ONLY in English: Even if input is in another language, output in English
+                6. Language consistency: ALWAYS output in the SAME language as the user's input.
+                   - If input is Chinese, output detailed Chinese prompt
+                   - If input is English, output detailed English prompt
+                   - Never translate the language, only enhance the content
                 7. Output ONLY the enhanced prompt: No explanations, no meta-commentary
 
                 If the input is already detailed and professional, return it as-is with minimal changes.
