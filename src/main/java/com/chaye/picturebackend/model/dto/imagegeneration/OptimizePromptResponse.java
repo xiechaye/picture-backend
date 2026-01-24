@@ -11,6 +11,16 @@ import java.io.Serializable;
 public class OptimizePromptResponse implements Serializable {
 
     /**
+     * 是否优化成功
+     */
+    private Boolean success = true;
+
+    /**
+     * 错误信息（当 success 为 false 时）
+     */
+    private String errorMessage;
+
+    /**
      * 原始输入
      */
     private String originalPrompt;

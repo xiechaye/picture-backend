@@ -140,44 +140,74 @@ public class ImageGenerationServiceImpl implements ImageGenerationService {
 
         long startTime = System.currentTimeMillis();
 
-        // 创建 Agent 并执行优化
-        ImagePromptOptimizerManus imagePromptOptimizerManus = new ImagePromptOptimizerManus(dashscopeChatModel, allTools);
-        imagePromptOptimizerManus.run(request.getPrompt());  // 执行优化流程
-
-        // 提取所有优化结果
-        String optimizedPrompt = imagePromptOptimizerManus.getOptimizedPrompt();
-        String recommendedSize = imagePromptOptimizerManus.getRecommendedSize();
-        String negativePrompt = imagePromptOptimizerManus.getNegativePrompt();
-
-        // 如果没有获取到优化结果，使用原始输入
-        if (optimizedPrompt == null || optimizedPrompt.isEmpty()) {
-            log.warn("未获取到优化结果，使用原始输入");
-            optimizedPrompt = request.getPrompt();
-        }
-
-        long optimizationTime = System.currentTimeMillis() - startTime;
-
-        // 返回完整的优化结果
+        // 创建响应对象
         OptimizePromptResponse response = new OptimizePromptResponse();
         response.setOriginalPrompt(request.getPrompt());
-        response.setOptimizedPrompt(optimizedPrompt);
-        response.setRecommendedSize(recommendedSize);  // 新增
-        response.setNegativePrompt(negativePrompt);    // 新增
 
-        log.info("Prompt优化完成，长度: {} -> {}, 耗时: {}ms",
-                request.getPrompt().length(),
-                optimizedPrompt.length(),
-                optimizationTime);
+        try {
+            // 创建 Agent 并执行优化
+            ImagePromptOptimizerManus imagePromptOptimizerManus = new ImagePromptOptimizerManus(dashscopeChatModel, allTools);
+            String runResult = imagePromptOptimizerManus.run(request.getPrompt());  // 执行优化流程
 
-        // 输出详细的优化结果
-        if (recommendedSize != null) {
-            log.info("推荐尺寸: {}", recommendedSize);
+            // 检查 Agent 执行结果是否包含错误
+            if (runResult != null && runResult.startsWith("执行错误")) {
+                log.error("Agent执行失败: {}", runResult);
+                response.setSuccess(false);
+                response.setErrorMessage("Prompt优化失败: " + runResult);
+                response.setOptimizedPrompt(request.getPrompt());  // 使用原始输入作为回退
+                return response;
+            }
+
+            // 提取所有优化结果
+            String optimizedPrompt = imagePromptOptimizerManus.getOptimizedPrompt();
+            String recommendedSize = imagePromptOptimizerManus.getRecommendedSize();
+            String negativePrompt = imagePromptOptimizerManus.getNegativePrompt();
+
+            // 检查优化结果是否包含错误信息（工具调用可能返回错误字符串）
+            if (optimizedPrompt != null && optimizedPrompt.startsWith("Error")) {
+                log.warn("Prompt优化工具返回错误: {}", optimizedPrompt);
+                response.setSuccess(false);
+                response.setErrorMessage(optimizedPrompt);
+                response.setOptimizedPrompt(request.getPrompt());  // 使用原始输入作为回退
+                return response;
+            }
+
+            // 如果没有获取到优化结果，使用原始输入
+            if (optimizedPrompt == null || optimizedPrompt.isEmpty()) {
+                log.warn("未获取到优化结果，使用原始输入");
+                optimizedPrompt = request.getPrompt();
+            }
+
+            long optimizationTime = System.currentTimeMillis() - startTime;
+
+            // 设置响应数据
+            response.setSuccess(true);
+            response.setOptimizedPrompt(optimizedPrompt);
+            response.setRecommendedSize(recommendedSize);
+            response.setNegativePrompt(negativePrompt);
+
+            log.info("Prompt优化完成，长度: {} -> {}, 耗时: {}ms",
+                    request.getPrompt().length(),
+                    optimizedPrompt.length(),
+                    optimizationTime);
+
+            // 输出详细的优化结果
+            if (recommendedSize != null) {
+                log.info("推荐尺寸: {}", recommendedSize);
+            }
+            if (negativePrompt != null) {
+                log.info("负面提示词: {}", negativePrompt);
+            }
+
+            return response;
+
+        } catch (Exception e) {
+            log.error("Prompt优化过程发生异常", e);
+            response.setSuccess(false);
+            response.setErrorMessage("Prompt优化失败: " + e.getMessage());
+            response.setOptimizedPrompt(request.getPrompt());  // 使用原始输入作为回退
+            return response;
         }
-        if (negativePrompt != null) {
-            log.info("负面提示词: {}", negativePrompt);
-        }
-
-        return response;
     }
 
     /**
