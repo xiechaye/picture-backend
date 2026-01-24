@@ -12,15 +12,12 @@ import com.chaye.picturebackend.exception.BusinessException;
 import com.chaye.picturebackend.exception.ErrorCode;
 import com.chaye.picturebackend.exception.ThrowUtils;
 import com.chaye.picturebackend.manager.CosManager;
-import com.chaye.picturebackend.manager.auth.SpaceUserAuthManager;
 import com.chaye.picturebackend.model.dto.imagegeneration.GenerateImageRequest;
 import com.chaye.picturebackend.model.dto.imagegeneration.ImageGenerationResponse;
 import com.chaye.picturebackend.model.dto.imagegeneration.OptimizePromptRequest;
 import com.chaye.picturebackend.model.dto.imagegeneration.OptimizePromptResponse;
-import com.chaye.picturebackend.model.entity.Space;
 import com.chaye.picturebackend.model.entity.User;
 import com.chaye.picturebackend.service.ImageGenerationService;
-import com.chaye.picturebackend.service.SpaceService;
 import com.chaye.picturebackend.tools.AspectRatioTool;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,10 +42,6 @@ public class ImageGenerationServiceImpl implements ImageGenerationService {
 
     private final ToolCallback[] allTools;
 
-    private final SpaceService spaceService;
-
-    private final SpaceUserAuthManager spaceUserAuthManager;
-
     private final ImageGenerationApi imageGenerationApi;  // 阿里云图像生成 API
 
     private final CosManager cosManager;  // 腾讯云 COS 管理器
@@ -68,16 +61,8 @@ public class ImageGenerationServiceImpl implements ImageGenerationService {
         // 1. 参数校验
         ThrowUtils.throwIf(StringUtils.isBlank(request.getPrompt()),
                 ErrorCode.PARAMS_ERROR, "图像描述不能为空");
-        ThrowUtils.throwIf(request.getSpaceId() == null,
-                ErrorCode.PARAMS_ERROR, "空间ID不能为空");
 
-        // 2. 校验空间权限
-        validateSpaceAccess(request.getSpaceId(), loginUser);
-
-        log.info("用户 {} 开始同步生成图像，spaceId={}, prompt={}",
-                loginUser.getId(), request.getSpaceId(), request.getPrompt());
-
-        //  移除 Agent 优化，直接使用用户提供的参数
+        log.info("用户 {} 开始同步生成图像，prompt={}", loginUser.getId(), request.getPrompt());
 
         // 构建最终 Prompt（如果用户提供了负面提示词，则合并）
         String finalPrompt = request.getPrompt();
@@ -120,7 +105,6 @@ public class ImageGenerationServiceImpl implements ImageGenerationService {
         response.setCosKey(cosKey);
         response.setOptimizedPrompt(request.getPrompt()); // 返回用户使用的 prompt
         response.setTotalTime(totalTime);
-        response.setSpaceId(request.getSpaceId());
 
         return response;
     }
@@ -208,26 +192,6 @@ public class ImageGenerationServiceImpl implements ImageGenerationService {
             response.setOptimizedPrompt(request.getPrompt());  // 使用原始输入作为回退
             return response;
         }
-    }
-
-    /**
-     * 校验空间权限
-     *
-     * @param spaceId   空间ID
-     * @param loginUser 登录用户
-     */
-    private void validateSpaceAccess(Long spaceId, User loginUser) {
-        // 1. 检查空间是否存在
-        Space space = spaceService.getById(spaceId);
-        ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR, "空间不存在");
-
-        // 2. 通过SpaceUserAuthManager获取权限列表
-        java.util.List<String> permissions = spaceUserAuthManager.getPermissionList(space, loginUser);
-
-        // 3. 权限列表为空表示无权限访问
-        ThrowUtils.throwIf(permissions.isEmpty(), ErrorCode.NO_AUTH_ERROR, "无权限访问该空间");
-
-        log.info("用户{}通过空间{}权限校验", loginUser.getId(), spaceId);
     }
 
     /**

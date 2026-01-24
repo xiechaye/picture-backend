@@ -30,10 +30,5 @@ public class ImageGenerationResponse implements Serializable {
      */
     private Long totalTime;
 
-    /**
-     * 空间ID
-     */
-    private Long spaceId;
-
     private static final long serialVersionUID = 1L;
 }

@@ -16,11 +16,6 @@ public class GenerateImageRequest implements Serializable {
     private String prompt;
 
     /**
-     * 空间ID
-     */
-    private Long spaceId;
-
-    /**
      * 图片尺寸（可选，格式："width,height"，如 "1024,1024"）
      * 如果不提供，使用默认尺寸
      */

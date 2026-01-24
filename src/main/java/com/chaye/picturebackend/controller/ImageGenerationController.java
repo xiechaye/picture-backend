@@ -45,8 +45,8 @@ public class ImageGenerationController {
     @PostMapping("/generate")
     @AuthCheck(mustRole = "user")
     @Operation(summary = "同步生成图像",
-               description = "直接使用用户提供的 prompt 生成图像，不自动优化。" +
-                             "如需优化，请先调用 /optimize-prompt 接口。" +
+               description = "使用 AI 生成图像并上传到临时存储。" +
+                             "生成的图像需要用户后期自行保存到空间。" +
                              "可选参数：size（图片尺寸，格式：width,height）、negativePrompt（负面提示词）")
     public BaseResponse<ImageGenerationResponse> generateImage(
             @RequestBody GenerateImageRequest request,
