@@ -38,4 +38,4 @@ build/
 
 ### Claude code ###
 CLAUDE.md
-settings.local.json
+.claude/
