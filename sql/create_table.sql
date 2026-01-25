@@ -136,6 +136,10 @@ create table if not exists sample_prompt
     INDEX idx_category (category)
 ) comment '示例提示词' collate = utf8mb4_unicode_ci;
 
+-- 添加默认管理员(用户名admin,密码12345678)
+INSERT INTO user (id, userAccount, userPassword, userName, userAvatar, userProfile, userRole, editTime, createTime, updateTime, isDelete, vipExpireTime, vipCode, vipNumber) VALUE
+(1, 'admin', '12319ad49c00cabb8d3409b160a5180b', 'admin', 'https://picture-1327683584.cos.ap-guangzhou.myqcloud.com//avatar/2026-01-06_nCmMuRcKRiTdjxjQ.jpg', '111', 'admin', '2026-01-09 19:05:24', '2026-01-09 19:05:34', '2026-01-09 19:05:26', 0, null, null, null);
+
 -- 初始示例数据（4个分类，10条数据）
 INSERT INTO sample_prompt (title, prompt, category) VALUES
 ('日落海滩', 'A breathtaking sunset over a serene beach with golden sand, calm turquoise waters reflecting the vibrant orange and pink sky, silhouettes of palm trees swaying gently, warm lighting, photorealistic, 8k resolution, cinematic composition', 'Scenery'),
