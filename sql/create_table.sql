@@ -122,3 +122,29 @@ ALTER TABLE user
     ADD COLUMN vipExpireTime datetime NULL COMMENT '会员过期时间',
     ADD COLUMN vipCode varchar(128) NULL COMMENT '会员兑换码',
     ADD COLUMN vipNumber bigint NULL COMMENT '会员编号';
+
+-- 示例提示词表
+create table if not exists sample_prompt
+(
+    id         bigint auto_increment comment 'id' primary key,
+    title      varchar(128)                       not null comment '短中文标题',
+    prompt     text                               not null comment '用于AI的长英文提示词',
+    category   varchar(64)                        not null comment '分类（如 Scenery, Anime, Cyberpunk）',
+    createTime datetime default CURRENT_TIMESTAMP not null comment '创建时间',
+    updateTime datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
+    isDelete   tinyint  default 0                 not null comment '是否删除',
+    INDEX idx_category (category)
+) comment '示例提示词' collate = utf8mb4_unicode_ci;
+
+-- 初始示例数据（4个分类，10条数据）
+INSERT INTO sample_prompt (title, prompt, category) VALUES
+('日落海滩', 'A breathtaking sunset over a serene beach with golden sand, calm turquoise waters reflecting the vibrant orange and pink sky, silhouettes of palm trees swaying gently, warm lighting, photorealistic, 8k resolution, cinematic composition', 'Scenery'),
+('雪山湖泊', 'Majestic snow-capped mountains surrounding a crystal-clear alpine lake, mirror-like water reflection, evergreen forest in the foreground, dramatic clouds, golden hour lighting, landscape photography style, ultra detailed, 4k', 'Scenery'),
+('樱花小径', 'A peaceful Japanese garden path lined with blooming cherry blossom trees, pink petals floating in the air, traditional stone lanterns, soft morning light filtering through branches, serene atmosphere, Studio Ghibli inspired, dreamy', 'Scenery'),
+('赛博朋克城市', 'Futuristic cyberpunk cityscape at night, towering neon-lit skyscrapers, holographic advertisements, flying vehicles, rain-soaked streets reflecting colorful lights, dense urban environment, Blade Runner aesthetic, moody atmosphere, 8k', 'Cyberpunk'),
+('霓虹街道', 'Narrow alleyway in a cyberpunk metropolis, steam rising from vents, neon signs in Japanese and Chinese characters, a lone figure with an umbrella, wet pavement reflections, high contrast lighting, cinematic noir style', 'Cyberpunk'),
+('动漫少女', 'Beautiful anime girl with long flowing silver hair, wearing an elegant blue kimono with floral patterns, standing under a full moon, cherry blossoms falling around her, soft ethereal glow, detailed illustration, anime art style', 'Anime'),
+('机甲战士', 'Powerful mecha robot in dynamic battle pose, sleek metallic armor with glowing energy cores, dramatic explosion in background, detailed mechanical design, anime style, high contrast lighting, epic composition', 'Anime'),
+('现代建筑', 'Award-winning modern architectural masterpiece, minimalist white concrete structure with large glass windows, geometric shapes, surrounded by reflecting pool, clear blue sky, professional architectural photography, symmetrical composition', 'Architecture'),
+('古典宫殿', 'Grand European palace interior with ornate baroque decorations, golden chandeliers, marble columns, intricate ceiling frescoes, red velvet curtains, dramatic natural light streaming through tall windows, opulent atmosphere', 'Architecture'),
+('未来都市', 'Utopian future city with sustainable architecture, vertical gardens on skyscrapers, clean energy infrastructure, elevated walkways, blue sky with fluffy clouds, optimistic sci-fi aesthetic, detailed urban planning, 4k render', 'Architecture');
