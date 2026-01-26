@@ -21,6 +21,9 @@ public class AliYunAiApi {
     @Value("${aliYunAi.apiKey}")
     private String apiKey;
 
+    @Value("${aliYunAi.model}")
+    private String model;
+
     // 创建任务地址
     public static final String CREATE_OUT_PAINTING_TASK_URL = "https://dashscope.aliyuncs.com/api/v1/services/aigc/image2image/out-painting";
 
@@ -37,6 +40,10 @@ public class AliYunAiApi {
     public CreateOutPaintingTaskResponse createOutPaintingTask(CreateOutPaintingTaskRequest createOutPaintingTaskRequest) {
         if (createOutPaintingTaskRequest == null) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "扩图参数为空");
+        }
+        // 设置模型参数
+        if (createOutPaintingTaskRequest.getModel() == null) {
+            createOutPaintingTaskRequest.setModel(model);
         }
         // 发送请求
         HttpRequest httpRequest = HttpRequest.post(CREATE_OUT_PAINTING_TASK_URL)
