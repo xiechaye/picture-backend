@@ -310,6 +310,25 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space>
 
         return spaceVOList;
     }
+
+    @Override
+    public boolean deleteSpace(Long spaceId, User loginUser) {
+        // 1. 校验空间是否存在
+        Space space = this.getById(spaceId);
+        ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR);
+        // 2. 校验权限
+        this.checkSpaceAuth(loginUser, space);
+        // 3. 使用事务级联删除
+        Boolean result = transactionTemplate.execute(status -> {
+            // 先删除 space_user 关联记录
+            spaceUserService.lambdaUpdate()
+                    .eq(SpaceUser::getSpaceId, spaceId)
+                    .remove();
+            // 再删除空间
+            return this.removeById(spaceId);
+        });
+        return Boolean.TRUE.equals(result);
+    }
 }
 
 

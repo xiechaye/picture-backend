@@ -61,13 +61,8 @@ public class SpaceController {
         }
         User loginUser = userService.getLoginUser(request);
         Long id = deleteRequest.getId();
-        // 判断是否存在
-        Space oldSpace = spaceService.getById(id);
-        ThrowUtils.throwIf(oldSpace == null, ErrorCode.NOT_FOUND_ERROR);
-        // 仅本人或者管理员可删除
-        spaceService.checkSpaceAuth(loginUser, oldSpace);
-        // 操作数据库
-        boolean result = spaceService.removeById(id);
+        // 级联删除空间及其关联的成员记录
+        boolean result = spaceService.deleteSpace(id, loginUser);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(true);
     }

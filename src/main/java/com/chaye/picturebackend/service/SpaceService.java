@@ -85,4 +85,13 @@ public interface SpaceService extends IService<Space> {
      * @return 空间列表（SpaceVO）
      */
     List<SpaceVO> listMySpaces(User loginUser, HttpServletRequest request);
+
+    /**
+     * 删除空间（级联删除关联的空间成员记录）
+     *
+     * @param spaceId   空间ID
+     * @param loginUser 当前登录用户
+     * @return 是否删除成功
+     */
+    boolean deleteSpace(Long spaceId, User loginUser);
 }
