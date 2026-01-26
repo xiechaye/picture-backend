@@ -36,6 +36,17 @@ public class PromptController {
     // region 用户接口
 
     /**
+     * 获取所有分类列表
+     *
+     * @return 分类列表（去重后的所有分类）
+     */
+    @GetMapping("/category/list")
+    public BaseResponse<List<String>> getCategories() {
+        List<String> categories = samplePromptService.getAllCategories();
+        return ResultUtils.success(categories);
+    }
+
+    /**
      * 获取多样化随机提示词
      *
      * @param count 数量（默认4，最大50）

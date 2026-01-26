@@ -37,6 +37,11 @@ public class SamplePromptServiceImpl extends ServiceImpl<SamplePromptMapper, Sam
     private final Map<String, List<SamplePrompt>> promptCache = new ConcurrentHashMap<>();
 
     /**
+     * 分类缓存（存储所有去重后的分类列表）
+     */
+    private final Map<String, List<String>> categoryCache = new ConcurrentHashMap<>();
+
+    /**
      * 初始化缓存
      */
     @PostConstruct
@@ -60,6 +65,40 @@ public class SamplePromptServiceImpl extends ServiceImpl<SamplePromptMapper, Sam
 
         log.info("提示词缓存已刷新，共 {} 条数据，{} 个分类",
                 allPrompts.size(), grouped.size());
+
+        // 刷新分类缓存
+        refreshCategoryCache(allPrompts);
+    }
+
+    /**
+     * 刷新分类缓存
+     */
+    private void refreshCategoryCache(List<SamplePrompt> allPrompts) {
+        // 提取所有分类并去重（使用 LinkedHashSet 保持顺序）
+        Set<String> categorySet = new LinkedHashSet<>();
+        for (SamplePrompt prompt : allPrompts) {
+            if (StrUtil.isNotBlank(prompt.getCategory())) {
+                categorySet.add(prompt.getCategory());
+            }
+        }
+
+        // 转换为列表
+        List<String> categories = new ArrayList<>(categorySet);
+
+        // 存储到分类缓存
+        categoryCache.clear();
+        categoryCache.put("all", categories);
+
+        log.info("分类缓存已刷新，共 {} 个分类", categories.size());
+    }
+
+    /**
+     * 获取所有分类（去重）
+     */
+    @Override
+    public List<String> getAllCategories() {
+        List<String> categories = categoryCache.get("all");
+        return categories != null ? categories : Collections.emptyList();
     }
 
     @Override

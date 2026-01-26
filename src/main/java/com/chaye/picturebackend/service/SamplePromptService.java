@@ -41,4 +41,11 @@ public interface SamplePromptService extends IService<SamplePrompt> {
      * 刷新缓存
      */
     void refreshCache();
+
+    /**
+     * 获取所有分类（去重）
+     *
+     * @return 分类列表（从现有提示词中提取去重）
+     */
+    List<String> getAllCategories();
 }
