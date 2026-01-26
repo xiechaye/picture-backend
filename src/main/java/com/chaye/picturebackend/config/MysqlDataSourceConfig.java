@@ -1,5 +1,6 @@
 package com.chaye.picturebackend.config;
 
+import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.annotation.MapperScan;
@@ -42,7 +43,9 @@ public class MysqlDataSourceConfig {
 
     @Bean(name = "sqlSessionFactory")
     @Primary
-    public SqlSessionFactory sqlSessionFactory(@Qualifier("primaryDataSource") DataSource dataSource) throws Exception {
+    public SqlSessionFactory sqlSessionFactory(
+            @Qualifier("primaryDataSource") DataSource dataSource,
+            @Qualifier("mybatisPlusInterceptor") MybatisPlusInterceptor mybatisPlusInterceptor) throws Exception {
         MybatisSqlSessionFactoryBean bean = new MybatisSqlSessionFactoryBean();
         bean.setDataSource(dataSource);
 
@@ -54,6 +57,9 @@ public class MysqlDataSourceConfig {
 
         configuration.setLogImpl(org.apache.ibatis.logging.stdout.StdOutImpl.class);
         bean.setConfiguration(configuration);
+
+        // 注入分页拦截器
+        bean.setPlugins(mybatisPlusInterceptor);
 
         return bean.getObject();
     }
