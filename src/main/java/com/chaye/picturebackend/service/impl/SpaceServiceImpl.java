@@ -87,17 +87,21 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space>
         if (SpaceLevelEnum.COMMON.getValue() != space.getSpaceLevel() && !userService.isAdmin(loginUser)) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限创建指定级别的空间");
         }
-        // 4. 控制同一用户只能创建一个私有空间、以及一个团队空间
+        // 4. 控制同一用户只能创建一个私有空间，以及最多5个团队空间
         String lock = String.valueOf(userId).intern();
         synchronized (lock) {
             Long newSpaceId = transactionTemplate.execute(status -> {
-                // 判断是否已有空间
-                boolean exists = this.lambdaQuery()
+                // 判断该用户已创建该类型空间的数量
+                long existingCount = this.lambdaQuery()
                         .eq(Space::getUserId, userId)
                         .eq(Space::getSpaceType, space.getSpaceType())
-                        .exists();
-                // 如果已有空间，就不能再创建
-                ThrowUtils.throwIf(exists, ErrorCode.OPERATION_ERROR, "每个用户每类空间只能创建一个");
+                        .count();
+                // 团队空间限制5个，私有空间限制1个
+                int maxSpaceCount = SpaceTypeEnum.TEAM.getValue() == space.getSpaceType() ? 5 : 1;
+                String errorMessage = SpaceTypeEnum.TEAM.getValue() == space.getSpaceType()
+                        ? "每个用户最多只能创建 " + maxSpaceCount + " 个团队空间"
+                        : "每个用户只能创建一个私有空间";
+                ThrowUtils.throwIf(existingCount >= maxSpaceCount, ErrorCode.OPERATION_ERROR, errorMessage);
                 // 创建
                 boolean result = this.save(space);
                 ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "保存空间到数据库失败");
