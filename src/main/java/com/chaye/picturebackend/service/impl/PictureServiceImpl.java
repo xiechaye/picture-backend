@@ -500,7 +500,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
     @Async
     @Override
     public void clearPictureFile(Picture oldPicture) {
-        // 判断改图片是否被多条记录使用
+        // 判断该图片是否被多条记录使用
         String pictureUrl = oldPicture.getUrl();
         long count = this.lambdaQuery()
                 .eq(Picture::getUrl, pictureUrl)
@@ -509,13 +509,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         if (count > 1) {
             return;
         }
-        // 删除图片
+        // 删除原图（缩略图为动态 URL，无需删除）
         cosManager.deleteObject(pictureUrl);
-        // 删除缩略图
-        String thumbnailUrl = oldPicture.getThumbnailUrl();
-        if (StrUtil.isNotBlank(thumbnailUrl)) {
-            cosManager.deleteObject(thumbnailUrl);
-        }
     }
 
     @Override

@@ -60,20 +60,14 @@ public abstract class PictureUploadTemplate {
             PutObjectResult putObjectResult = cosManager.putPictureObject(uploadPath, file);
             // 5. 获取图片信息对象，封装返回结果
             ImageInfo imageInfo = putObjectResult.getCiUploadResult().getOriginalInfo().getImageInfo();
-            // 获取到图片处理结果
+            // 获取到图片处理结果（由于移除了预生成，这里通常为空）
             ProcessResults processResults = putObjectResult.getCiUploadResult().getProcessResults();
             List<CIObject> objectList = processResults.getObjectList();
             if (CollUtil.isNotEmpty(objectList)) {
-                // 获取压缩之后得到的文件信息
-                CIObject compressedCiObject = objectList.get(0);
-                // 缩略图默认等于压缩图
-                CIObject thumbnailCiObject = compressedCiObject;
-                // 有生成缩略图，才获取缩略图
-                if (objectList.size() > 1) {
-                    thumbnailCiObject = objectList.get(1);
-                }
-                // 封装压缩图的返回结果
-                return buildResult(originalFilename, compressedCiObject, thumbnailCiObject, imageInfo);
+                // 获取原图对象
+                CIObject ciObject = objectList.get(0);
+                // 封装返回结果
+                return buildResult(originalFilename, ciObject, imageInfo);
             }
             return buildResult(originalFilename, file, uploadPath, imageInfo);
         } catch (Exception e) {
@@ -102,43 +96,43 @@ public abstract class PictureUploadTemplate {
     protected abstract void processFile(Object inputSource, File file) throws Exception;
 
     /**
-     * 封装返回结果
+     * 封装返回结果（有处理对象时）
      *
-     * @param originalFilename   原始文件名
-     * @param compressedCiObject 压缩后的对象
-     * @param thumbnailCiObject 缩略图对象
-     * @param imageInfo 图片信息
+     * @param originalFilename 原始文件名
+     * @param ciObject        COS 返回的对象
+     * @param imageInfo       图片信息
      * @return
      */
-    private UploadPictureResult buildResult(String originalFilename, CIObject compressedCiObject, CIObject thumbnailCiObject,
-                                            ImageInfo imageInfo) {
+    private UploadPictureResult buildResult(String originalFilename, CIObject ciObject, ImageInfo imageInfo) {
         // 计算宽高
-        int picWidth = compressedCiObject.getWidth();
-        int picHeight = compressedCiObject.getHeight();
+        int picWidth = ciObject.getWidth();
+        int picHeight = ciObject.getHeight();
         double picScale = NumberUtil.round(picWidth * 1.0 / picHeight, 2).doubleValue();
         // 封装返回结果
         UploadPictureResult uploadPictureResult = new UploadPictureResult();
-        // 设置压缩后的原图地址
-        uploadPictureResult.setUrl(cosClientConfig.getHost() + "/" + compressedCiObject.getKey());
+        // 设置原图地址
+        String originalUrl = cosClientConfig.getHost() + "/" + ciObject.getKey();
+        uploadPictureResult.setUrl(originalUrl);
         uploadPictureResult.setPicName(FileUtil.mainName(originalFilename));
-        uploadPictureResult.setPicSize(compressedCiObject.getSize().longValue());
+        uploadPictureResult.setPicSize(ciObject.getSize().longValue());
         uploadPictureResult.setPicWidth(picWidth);
         uploadPictureResult.setPicHeight(picHeight);
         uploadPictureResult.setPicScale(picScale);
-        uploadPictureResult.setPicFormat(compressedCiObject.getFormat());
+        uploadPictureResult.setPicFormat(ciObject.getFormat());
         uploadPictureResult.setPicColor(imageInfo.getAve());
-        // 设置缩略图地址
-        uploadPictureResult.setThumbnailUrl(cosClientConfig.getHost() + "/" + thumbnailCiObject.getKey());
+        // 设置动态缩略图 URL（使用 COS 实时处理）
+        String dynamicThumbnailUrl = originalUrl + "?imageMogr2/thumbnail/256x256>";
+        uploadPictureResult.setThumbnailUrl(dynamicThumbnailUrl);
         // 返回可访问的地址
         return uploadPictureResult;
     }
 
     /**
-     * 封装返回结果
+     * 封装返回结果（无处理对象时）
      *
-     * @param originalFilename
-     * @param file
-     * @param uploadPath
+     * @param originalFilename 原始文件名
+     * @param file             本地文件
+     * @param uploadPath       上传路径
      * @param imageInfo        对象存储返回的图片信息
      * @return
      */
@@ -149,7 +143,9 @@ public abstract class PictureUploadTemplate {
         double picScale = NumberUtil.round(picWidth * 1.0 / picHeight, 2).doubleValue();
         // 封装返回结果
         UploadPictureResult uploadPictureResult = new UploadPictureResult();
-        uploadPictureResult.setUrl(cosClientConfig.getHost() + "/" + uploadPath);
+        // 设置原图地址
+        String originalUrl = cosClientConfig.getHost() + "/" + uploadPath;
+        uploadPictureResult.setUrl(originalUrl);
         uploadPictureResult.setPicName(FileUtil.mainName(originalFilename));
         uploadPictureResult.setPicSize(FileUtil.size(file));
         uploadPictureResult.setPicWidth(picWidth);
@@ -157,6 +153,9 @@ public abstract class PictureUploadTemplate {
         uploadPictureResult.setPicScale(picScale);
         uploadPictureResult.setPicFormat(imageInfo.getFormat());
         uploadPictureResult.setPicColor(imageInfo.getAve());
+        // 设置动态缩略图 URL（使用 COS 实时处理）
+        String dynamicThumbnailUrl = originalUrl + "?imageMogr2/thumbnail/256x256>";
+        uploadPictureResult.setThumbnailUrl(dynamicThumbnailUrl);
         // 返回可访问的地址
         return uploadPictureResult;
     }
@@ -177,16 +176,3 @@ public abstract class PictureUploadTemplate {
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
