@@ -5,6 +5,7 @@ import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.RandomUtil;
 import com.qcloud.cos.model.PutObjectResult;
 import com.chaye.picturebackend.config.CosClientConfig;
+import com.chaye.picturebackend.config.FileUploadConfig;
 import com.chaye.picturebackend.exception.BusinessException;
 import com.chaye.picturebackend.exception.ErrorCode;
 import com.chaye.picturebackend.exception.ThrowUtils;
@@ -18,7 +19,6 @@ import jakarta.annotation.Resource;
 import java.io.File;
 import java.util.Arrays;
 import java.util.Date;
-import java.util.List;
 
 /**
  * 文件服务实现类
@@ -33,23 +33,17 @@ public class FileServiceImpl implements FileService {
     @Resource
     private CosManager cosManager;
 
-    // 允许上传的文件后缀列表
-    private static final List<String> ALLOW_FORMAT_LIST = Arrays.asList("jpeg", "jpg", "png", "gif", "bmp", "webp", "ico");
-    
-    // 允许上传的文件大小（头像最大5MB）
-    private static final long MAX_AVATAR_SIZE = 5 * 1024 * 1024;
-    
-    // 允许上传的通用文件大小（最大50MB）
-    private static final long MAX_FILE_SIZE = 50 * 1024 * 1024;
+    @Resource
+    private FileUploadConfig fileUploadConfig;
 
     @Override
     public String uploadFile(MultipartFile file, String uploadPathPrefix) {
         // 校验文件
-        validFile(file, MAX_FILE_SIZE);
-        
+        validFile(file, fileUploadConfig.getMaxFileSize());
+
         // 生成上传路径
         String uploadPath = generateUploadPath(file, uploadPathPrefix);
-        
+
         // 上传文件
         return uploadToCos(file, uploadPath);
     }
@@ -58,10 +52,10 @@ public class FileServiceImpl implements FileService {
     public String uploadAvatar(MultipartFile file) {
         // 校验头像文件
         validAvatar(file);
-        
+
         // 生成头像上传路径（统一存储在avatar目录下）
         String uploadPath = generateUploadPath(file, "avatar");
-        
+
         // 上传文件
         return uploadToCos(file, uploadPath);
     }
@@ -71,29 +65,32 @@ public class FileServiceImpl implements FileService {
      */
     private void validFile(MultipartFile multipartFile, long maxSize) {
         ThrowUtils.throwIf(multipartFile == null, ErrorCode.PARAMS_ERROR, "文件不能为空");
-        
+
         // 1. 校验文件大小
         long fileSize = multipartFile.getSize();
         ThrowUtils.throwIf(fileSize == 0, ErrorCode.PARAMS_ERROR, "文件不能为空");
-        ThrowUtils.throwIf(fileSize > maxSize, ErrorCode.PARAMS_ERROR, "文件大小不能超过 " + (maxSize / (1024 * 1024)) + "MB");
-        
+        String maxSizeMB = String.valueOf(maxSize / (1024 * 1024));
+        ThrowUtils.throwIf(fileSize > maxSize, ErrorCode.PARAMS_ERROR,
+                "文件大小不能超过 " + maxSizeMB + "MB");
+
         // 2. 校验文件后缀
         String fileSuffix = FileUtil.getSuffix(multipartFile.getOriginalFilename());
         ThrowUtils.throwIf(fileSuffix == null || fileSuffix.isEmpty(), ErrorCode.PARAMS_ERROR, "文件后缀名不能为空");
-        
+
         // 3. 验证文件后缀是否合法
-        ThrowUtils.throwIf(!ALLOW_FORMAT_LIST.contains(fileSuffix.toLowerCase()), ErrorCode.PARAMS_ERROR, "不支持的文件类型，仅支持 " + ALLOW_FORMAT_LIST);
+        ThrowUtils.throwIf(!fileUploadConfig.getAllowedFileFormats().contains(fileSuffix.toLowerCase()),
+                ErrorCode.PARAMS_ERROR, "不支持的文件类型，仅支持 " + fileUploadConfig.getAllowedFileFormats());
     }
 
     /**
      * 校验头像文件
      */
     private void validAvatar(MultipartFile multipartFile) {
-        validFile(multipartFile, MAX_AVATAR_SIZE);
-        
+        validFile(multipartFile, fileUploadConfig.getMaxAvatarSize());
+
         // 头像额外校验：必须是图片格式
         String fileSuffix = FileUtil.getSuffix(multipartFile.getOriginalFilename());
-        if (!Arrays.asList("jpeg", "jpg", "png", "gif", "bmp", "webp").contains(fileSuffix.toLowerCase())) {
+        if (!fileUploadConfig.getAllowedPictureFormats().contains(fileSuffix.toLowerCase())) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "头像必须是图片格式");
         }
     }
@@ -118,21 +115,21 @@ public class FileServiceImpl implements FileService {
             // 创建临时文件
             tempFile = File.createTempFile("upload_", null);
             file.transferTo(tempFile);
-            
+
             // 如果是头像文件，使用普通上传（不进行图片处理）
             if (uploadPath.contains("/avatar/")) {
                 PutObjectResult putObjectResult = cosManager.putObject(uploadPath, tempFile);
             } else {
                 // 如果是图片文件，使用图片上传（进行图片处理）
                 String fileSuffix = FileUtil.getSuffix(file.getOriginalFilename());
-                if (Arrays.asList("jpeg", "jpg", "png", "gif", "bmp", "webp").contains(fileSuffix.toLowerCase())) {
+                if (fileUploadConfig.getAllowedPictureFormats().contains(fileSuffix.toLowerCase())) {
                     cosManager.putPictureObject(uploadPath, tempFile);
                 } else {
                     // 非图片文件使用普通上传
                     cosManager.putObject(uploadPath, tempFile);
                 }
             }
-            
+
             // 返回文件访问地址
             return cosClientConfig.getHost() + "/" + uploadPath;
         } catch (Exception e) {

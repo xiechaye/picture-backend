@@ -130,6 +130,20 @@ cos:
     region: xxx
     bucket: xxx
 
+# 文件上传配置
+file:
+  upload:
+    # 图片上传最大大小（字节）
+    max-picture-size: 52428800  # 50MB
+    # 通用文件上传最大大小（字节）
+    max-file-size: 52428800     # 50MB
+    # 头像上传最大大小（字节）
+    max-avatar-size: 5242880    # 5MB
+    # 允许的图片格式
+    allowed-picture-formats: jpeg,png,jpg,webp
+    # 允许的文件格式
+    allowed-file-formats: jpeg,jpg,png,gif,bmp,webp,ico
+
 # 阿里云 AI 配置
 aliYunAi:
   model: xxx

@@ -6,9 +6,11 @@ import cn.hutool.http.HttpResponse;
 import cn.hutool.http.HttpStatus;
 import cn.hutool.http.HttpUtil;
 import cn.hutool.http.Method;
+import com.chaye.picturebackend.config.FileUploadConfig;
 import com.chaye.picturebackend.exception.BusinessException;
 import com.chaye.picturebackend.exception.ErrorCode;
 import com.chaye.picturebackend.exception.ThrowUtils;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -22,6 +24,9 @@ import java.util.List;
  */
 @Service
 public class UrlPictureUpload extends PictureUploadTemplate {
+
+    @Resource
+    private FileUploadConfig fileUploadConfig;
 
     @Override
     protected void validPicture(Object inputSource) {
@@ -62,8 +67,10 @@ public class UrlPictureUpload extends PictureUploadTemplate {
             if (StrUtil.isNotBlank(contentLengthStr)) {
                 try {
                     long contentLength = Long.parseLong(contentLengthStr);
-                    final long ONE_M = 1024 * 1024;
-                    ThrowUtils.throwIf(contentLength > 50 * ONE_M, ErrorCode.PARAMS_ERROR, "文件大小不能超过 50MB");
+                    long maxSize = fileUploadConfig.getMaxPictureSize();
+                    String maxSizeMB = String.valueOf(maxSize / (1024 * 1024));
+                    ThrowUtils.throwIf(contentLength > maxSize, ErrorCode.PARAMS_ERROR,
+                            "文件大小不能超过 " + maxSizeMB + "MB");
                 } catch (NumberFormatException e) {
                     throw new BusinessException(ErrorCode.PARAMS_ERROR, "文件大小格式异常");
                 }

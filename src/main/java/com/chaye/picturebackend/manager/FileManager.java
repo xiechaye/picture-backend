@@ -7,6 +7,7 @@ import cn.hutool.core.util.RandomUtil;
 import com.qcloud.cos.model.PutObjectResult;
 import com.qcloud.cos.model.ciModel.persistence.ImageInfo;
 import com.chaye.picturebackend.config.CosClientConfig;
+import com.chaye.picturebackend.config.FileUploadConfig;
 import com.chaye.picturebackend.exception.BusinessException;
 import com.chaye.picturebackend.exception.ErrorCode;
 import com.chaye.picturebackend.exception.ThrowUtils;
@@ -35,6 +36,9 @@ public class FileManager {
 
     @Resource
     private CosManager cosManager;
+
+    @Resource
+    private FileUploadConfig fileUploadConfig;
 
     /**
      * 上传图片
@@ -95,13 +99,14 @@ public class FileManager {
         ThrowUtils.throwIf(multipartFile == null, ErrorCode.PARAMS_ERROR, "文件不能为空");
         // 1. 校验文件大小
         long fileSize = multipartFile.getSize();
-        final long ONE_M = 1024 * 1024;
-        ThrowUtils.throwIf(fileSize > 50 * ONE_M, ErrorCode.PARAMS_ERROR, "文件大小不能超过 50MB");
+        long maxSize = fileUploadConfig.getMaxPictureSize();
+        String maxSizeMB = String.valueOf(maxSize / (1024 * 1024));
+        ThrowUtils.throwIf(fileSize > maxSize, ErrorCode.PARAMS_ERROR,
+                "文件大小不能超过 " + maxSizeMB + "MB");
         // 2. 校验文件后缀
         String fileSuffix = FileUtil.getSuffix(multipartFile.getOriginalFilename());
-        // 允许上传的文件后缀列表（或者集合）
-        final List<String> ALLOW_FORMAT_LIST = Arrays.asList("jpeg", "png", "jpg", "webp");
-        ThrowUtils.throwIf(!ALLOW_FORMAT_LIST.contains(fileSuffix), ErrorCode.PARAMS_ERROR, "文件类型错误");
+        ThrowUtils.throwIf(!fileUploadConfig.getAllowedPictureFormats().contains(fileSuffix),
+                ErrorCode.PARAMS_ERROR, "文件类型错误");
     }
 
     /**
