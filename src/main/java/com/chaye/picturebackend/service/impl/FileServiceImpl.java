@@ -39,8 +39,8 @@ public class FileServiceImpl implements FileService {
     // 允许上传的文件大小（头像最大5MB）
     private static final long MAX_AVATAR_SIZE = 5 * 1024 * 1024;
     
-    // 允许上传的通用文件大小（最大10MB）
-    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
+    // 允许上传的通用文件大小（最大50MB）
+    private static final long MAX_FILE_SIZE = 50 * 1024 * 1024;
 
     @Override
     public String uploadFile(MultipartFile file, String uploadPathPrefix) {
