@@ -129,6 +129,8 @@ cos:
     secretKey: xxx
     region: xxx
     bucket: xxx
+    # 是否启用 webp 格式转换（默认：false 保持原始格式）
+    enable-webp-convert: false
 
 # 文件上传配置
 file:

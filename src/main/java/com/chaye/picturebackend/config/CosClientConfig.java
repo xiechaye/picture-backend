@@ -41,6 +41,12 @@ public class CosClientConfig {
      */
     private String bucket;
 
+    /**
+     * 是否启用 webp 格式转换
+     * 默认：false（保持原始格式）
+     */
+    private Boolean enableWebpConvert = false;
+
     @Bean
     public COSClient cosClient() {
         // 1 初始化用户身份信息（secretId, secretKey）。
