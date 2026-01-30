@@ -62,12 +62,14 @@ public abstract class PictureUploadTemplate {
             ImageInfo imageInfo = putObjectResult.getCiUploadResult().getOriginalInfo().getImageInfo();
             // 获取到图片处理结果（由于移除了预生成，这里通常为空）
             ProcessResults processResults = putObjectResult.getCiUploadResult().getProcessResults();
-            List<CIObject> objectList = processResults.getObjectList();
-            if (CollUtil.isNotEmpty(objectList)) {
-                // 获取原图对象
-                CIObject ciObject = objectList.get(0);
-                // 封装返回结果
-                return buildResult(originalFilename, ciObject, imageInfo);
+            if (processResults != null) {
+                List<CIObject> objectList = processResults.getObjectList();
+                if (CollUtil.isNotEmpty(objectList)) {
+                    // 获取原图对象
+                    CIObject ciObject = objectList.get(0);
+                    // 封装返回结果
+                    return buildResult(originalFilename, ciObject, imageInfo);
+                }
             }
             return buildResult(originalFilename, file, uploadPath, imageInfo);
         } catch (Exception e) {
