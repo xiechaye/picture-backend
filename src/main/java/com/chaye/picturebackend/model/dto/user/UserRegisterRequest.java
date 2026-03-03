@@ -38,4 +38,16 @@ public class UserRegisterRequest implements Serializable {
     @NotBlank(message = "确认密码不能为空")
     private String checkPassword;
 
+    /**
+     * 验证码 ID
+     */
+    @NotBlank(message = "验证码 ID 不能为空")
+    private String captchaId;
+
+    /**
+     * 验证码
+     */
+    @NotBlank(message = "验证码不能为空")
+    private String captchaCode;
+
 }

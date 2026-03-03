@@ -12,8 +12,10 @@ import com.chaye.picturebackend.exception.ErrorCode;
 import com.chaye.picturebackend.exception.ThrowUtils;
 import com.chaye.picturebackend.model.dto.user.*;
 import com.chaye.picturebackend.model.entity.User;
+import com.chaye.picturebackend.model.vo.CaptchaResponse;
 import com.chaye.picturebackend.model.vo.LoginUserVO;
 import com.chaye.picturebackend.model.vo.UserVO;
+import com.chaye.picturebackend.service.CaptchaService;
 import com.chaye.picturebackend.service.UserService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
@@ -30,11 +32,30 @@ public class UserController {
     @Resource
     private UserService userService;
 
+    @Resource
+    private CaptchaService captchaService;
+
+    /**
+     * 获取验证码
+     */
+    @GetMapping("/captcha")
+    public BaseResponse<CaptchaResponse> getCaptcha() {
+        CaptchaResponse captchaResponse = captchaService.generateCaptcha();
+        return ResultUtils.success(captchaResponse);
+    }
+
     /**
      * 用户注册
      */
     @PostMapping("/register")
     public BaseResponse<Long> userRegister(@Valid @RequestBody UserRegisterRequest userRegisterRequest) {
+        // 校验验证码
+        boolean captchaValid = captchaService.verifyCaptcha(
+                userRegisterRequest.getCaptchaId(),
+                userRegisterRequest.getCaptchaCode()
+        );
+        ThrowUtils.throwIf(!captchaValid, ErrorCode.CAPTCHA_ERROR);
+
         // 验证注解会自动触发，无需手动 null 检查
         String userAccount = userRegisterRequest.getUserAccount();
         String userPassword = userRegisterRequest.getUserPassword();
@@ -47,8 +68,14 @@ public class UserController {
      * 用户登录
      */
     @PostMapping("/login")
-    public BaseResponse<LoginUserVO> userLogin(@RequestBody UserLoginRequest userLoginRequest, HttpServletRequest request) {
-        ThrowUtils.throwIf(userLoginRequest == null, ErrorCode.PARAMS_ERROR);
+    public BaseResponse<LoginUserVO> userLogin(@Valid @RequestBody UserLoginRequest userLoginRequest, HttpServletRequest request) {
+        // 校验验证码
+        boolean captchaValid = captchaService.verifyCaptcha(
+                userLoginRequest.getCaptchaId(),
+                userLoginRequest.getCaptchaCode()
+        );
+        ThrowUtils.throwIf(!captchaValid, ErrorCode.CAPTCHA_ERROR);
+
         String userAccount = userLoginRequest.getUserAccount();
         String userPassword = userLoginRequest.getUserPassword();
         LoginUserVO loginUserVO = userService.userLogin(userAccount, userPassword, request);

@@ -132,6 +132,19 @@ cos:
     # 是否启用 webp 格式转换（默认：false 保持原始格式）
     enable-webp-convert: false
 
+# 验证码配置
+captcha:
+  # 验证码有效期（秒），默认 5 分钟
+  expire-seconds: 300
+  # 验证码宽度（像素）
+  width: 120
+  # 验证码高度（像素）
+  height: 40
+  # 验证码字符数
+  code-count: 4
+  # 干扰线数
+  line-count: 5
+
 # 文件上传配置
 file:
   upload:
