@@ -26,8 +26,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.util.DigestUtils;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
@@ -47,6 +47,11 @@ import java.util.stream.Collectors;
 @Slf4j
 public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         implements UserService {
+
+    /**
+     * BCrypt 密码编码器（每个密码自动生成唯一随机盐值）
+     */
+    private final BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder();
 
     /**
      * 用户注册
@@ -105,16 +110,18 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         if (userPassword.length() < 8) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户密码错误");
         }
-        // 2. 对用户传递的密码进行加密
-        String encryptPassword = getEncryptPassword(userPassword);
-        // 3. 查询数据库中的用户是否存在
+        // 2. 先根据用户名查询用户
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("userAccount", userAccount);
-        queryWrapper.eq("userPassword", encryptPassword);
         User user = this.baseMapper.selectOne(queryWrapper);
         // 不存在，抛异常
         if (user == null) {
-            log.info("user login failed, userAccount cannot match userPassword");
+            log.info("user login failed, userAccount not found");
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户不存在或者密码错误");
+        }
+        // 3. 使用 BCrypt 验证密码
+        if (!bCryptPasswordEncoder.matches(userPassword, user.getUserPassword())) {
+            log.info("user login failed, password mismatch");
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户不存在或者密码错误");
         }
         // 4. 保存用户的登录态
@@ -126,16 +133,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     }
 
     /**
-     * 获取加密后的密码
+     * 获取加密后的密码（使用 BCrypt，每个密码自动生成唯一随机盐值）
      *
      * @param userPassword 用户密码
-     * @return 加密后的密码
+     * @return 加密后的密码（格式：$2a$10$...）
      */
     @Override
     public String getEncryptPassword(String userPassword) {
-        // 加盐，混淆密码
-        final String SALT = "chaye";
-        return DigestUtils.md5DigestAsHex((SALT + userPassword).getBytes());
+        // BCrypt 自动为每个密码生成唯一随机盐值，无需手动加盐
+        return bCryptPasswordEncoder.encode(userPassword);
     }
 
     @Override
