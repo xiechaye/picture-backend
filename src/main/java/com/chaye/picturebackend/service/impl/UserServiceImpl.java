@@ -356,6 +356,32 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     }
 
     // endregion ------- 以下代码为用户兑换会员功能 --------
+
+    @Override
+    public boolean resetPassword(Long id, String userPassword) {
+        // 1. 参数校验
+        if (id == null || id <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户 ID 无效");
+        }
+        if (StrUtil.isBlank(userPassword)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "新密码不能为空");
+        }
+        if (userPassword.length() < 8) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "新密码长度不能少于 8 位");
+        }
+        // 2. 查询用户是否存在
+        User user = this.getById(id);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "用户不存在");
+        }
+        // 3. 加密新密码
+        String encryptPassword = getEncryptPassword(userPassword);
+        // 4. 更新密码
+        User updateUser = new User();
+        updateUser.setId(id);
+        updateUser.setUserPassword(encryptPassword);
+        return this.updateById(updateUser);
+    }
 }
 
 

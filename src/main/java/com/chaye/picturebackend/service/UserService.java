@@ -104,4 +104,13 @@ public interface UserService extends IService<User> {
      * 用户兑换会员（会员码兑换）
      */
     boolean exchangeVip(User user, String vipCode);
+
+    /**
+     * 重置用户密码（仅管理员）
+     *
+     * @param id           用户 ID
+     * @param userPassword 新密码
+     * @return 是否重置成功
+     */
+    boolean resetPassword(Long id, String userPassword);
 }

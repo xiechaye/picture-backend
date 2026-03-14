@@ -1,6 +1,7 @@
 package com.chaye.picturebackend.controller;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.chaye.picturebackend.annotation.AuthCheck;
 import com.chaye.picturebackend.common.BaseResponse;
@@ -212,6 +213,26 @@ public class UserController {
         User loginUser = userService.getLoginUser(httpServletRequest);
         // 调用 service 层的方法进行会员兑换
         boolean result = userService.exchangeVip(loginUser, vipCode);
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 重置用户密码（仅管理员）
+     */
+    @PostMapping("/reset/password")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Boolean> resetPassword(@RequestBody UserResetPasswordRequest userResetPasswordRequest) {
+        ThrowUtils.throwIf(userResetPasswordRequest == null, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(userResetPasswordRequest.getId() == null, ErrorCode.PARAMS_ERROR, "用户 ID 不能为空");
+        ThrowUtils.throwIf(
+                StrUtil.hasBlank(userResetPasswordRequest.getUserPassword()),
+                ErrorCode.PARAMS_ERROR,
+                "新密码不能为空"
+        );
+        boolean result = userService.resetPassword(
+                userResetPasswordRequest.getId(),
+                userResetPasswordRequest.getUserPassword()
+        );
         return ResultUtils.success(result);
     }
 
