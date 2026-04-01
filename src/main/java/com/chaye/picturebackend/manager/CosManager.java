@@ -44,6 +44,52 @@ public class CosManager {
     }
 
     /**
+     * 下载对象到临时文件
+     *
+     * @param key 唯一键
+     * @return 临时文件
+     */
+    public File downloadToTempFile(String key) {
+        GetObjectRequest getObjectRequest = new GetObjectRequest(cosClientConfig.getBucket(), key);
+        COSObject cosObject = cosClient.getObject(getObjectRequest);
+        try {
+            // 创建临时文件
+            String suffix = getFileExtension(key);
+            File tempFile = File.createTempFile("cos_download_", suffix);
+            // 复制内容到临时文件
+            cosObject.getObjectContent().transferTo(java.nio.file.Files.newOutputStream(tempFile.toPath()));
+            return tempFile;
+        } catch (Exception e) {
+            throw new RuntimeException("下载文件到临时目录失败: " + e.getMessage(), e);
+        } finally {
+            // 关闭流
+            try {
+                if (cosObject.getObjectContent() != null) {
+                    cosObject.getObjectContent().close();
+                }
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    /**
+     * 获取文件扩展名
+     *
+     * @param filename 文件名
+     * @return 扩展名（包含点号）
+     */
+    private String getFileExtension(String filename) {
+        if (filename == null || filename.isEmpty()) {
+            return ".tmp";
+        }
+        int lastDotIndex = filename.lastIndexOf('.');
+        if (lastDotIndex > 0 && lastDotIndex < filename.length() - 1) {
+            return filename.substring(lastDotIndex);
+        }
+        return ".tmp";
+    }
+
+    /**
      * 上传对象（仅获取原图信息，不进行预处理）
      * 缩略图改用 COS 实时处理，通过 URL 参数动态生成
      *
