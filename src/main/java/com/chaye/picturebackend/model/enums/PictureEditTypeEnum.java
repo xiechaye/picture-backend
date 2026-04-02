@@ -20,11 +20,7 @@ public enum PictureEditTypeEnum {
     /**
      * 图片增强
      */
-    ENHANCE("图片增强", "ENHANCE"),
-    /**
-     * 背景替换
-     */
-    REPLACE_BACKGROUND("背景替换", "REPLACE_BACKGROUND");
+    ENHANCE("图片增强", "ENHANCE");
 
     private final String text;
 

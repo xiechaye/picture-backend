@@ -7,7 +7,6 @@ import com.chaye.picturebackend.manager.auth.annotation.SaSpaceCheckPermission;
 import com.chaye.picturebackend.manager.auth.model.SpaceUserPermissionConstant;
 import com.chaye.picturebackend.model.dto.pictureedit.PictureEnhanceRequest;
 import com.chaye.picturebackend.model.dto.pictureedit.PictureRemoveWatermarkRequest;
-import com.chaye.picturebackend.model.dto.pictureedit.PictureReplaceBackgroundRequest;
 import com.chaye.picturebackend.model.dto.pictureedit.PictureSegmentRequest;
 import com.chaye.picturebackend.model.entity.User;
 import com.chaye.picturebackend.model.vo.PictureEditTaskVO;
@@ -77,20 +76,6 @@ public class PictureEditController {
             HttpServletRequest httpRequest) {
         User loginUser = userService.getLoginUser(httpRequest);
         PictureEditTaskVO taskVO = pictureEditService.enhanceImage(request, loginUser);
-        return ResultUtils.success(taskVO);
-    }
-
-    /**
-     * 背景替换
-     */
-    @PostMapping("/replace-background")
-    @Operation(summary = "背景替换", description = "AI 替换图片背景，支持纯色、图片、透明背景")
-    @SaSpaceCheckPermission(value = SpaceUserPermissionConstant.PICTURE_EDIT)
-    public BaseResponse<PictureEditTaskVO> replaceBackground(
-            @RequestBody PictureReplaceBackgroundRequest request,
-            HttpServletRequest httpRequest) {
-        User loginUser = userService.getLoginUser(httpRequest);
-        PictureEditTaskVO taskVO = pictureEditService.replaceBackground(request, loginUser);
         return ResultUtils.success(taskVO);
     }
 

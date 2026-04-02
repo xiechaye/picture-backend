@@ -3,7 +3,6 @@ package com.chaye.picturebackend.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.chaye.picturebackend.model.dto.pictureedit.PictureEnhanceRequest;
 import com.chaye.picturebackend.model.dto.pictureedit.PictureRemoveWatermarkRequest;
-import com.chaye.picturebackend.model.dto.pictureedit.PictureReplaceBackgroundRequest;
 import com.chaye.picturebackend.model.dto.pictureedit.PictureSegmentRequest;
 import com.chaye.picturebackend.model.entity.PictureEditTask;
 import com.chaye.picturebackend.model.entity.User;
@@ -40,15 +39,6 @@ public interface PictureEditService extends IService<PictureEditTask> {
      * @return 编辑任务
      */
     PictureEditTaskVO enhanceImage(PictureEnhanceRequest request, User loginUser);
-
-    /**
-     * 背景替换
-     *
-     * @param request    背景替换请求
-     * @param loginUser  登录用户
-     * @return 编辑任务
-     */
-    PictureEditTaskVO replaceBackground(PictureReplaceBackgroundRequest request, User loginUser);
 
     /**
      * 查询编辑任务状态

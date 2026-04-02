@@ -18,7 +18,6 @@ import com.chaye.picturebackend.mapper.PictureEditTaskMapper;
 import com.chaye.picturebackend.mapper.PictureMapper;
 import com.chaye.picturebackend.model.dto.pictureedit.PictureEnhanceRequest;
 import com.chaye.picturebackend.model.dto.pictureedit.PictureRemoveWatermarkRequest;
-import com.chaye.picturebackend.model.dto.pictureedit.PictureReplaceBackgroundRequest;
 import com.chaye.picturebackend.model.dto.pictureedit.PictureSegmentRequest;
 import com.chaye.picturebackend.model.entity.Picture;
 import com.chaye.picturebackend.model.entity.PictureEditTask;
@@ -162,36 +161,6 @@ public class PictureEditServiceImpl extends ServiceImpl<PictureEditTaskMapper, P
         // 创建任务
         return createEditTask(apiRequest, picture.getId(), loginUser.getId(),
                 PictureEditTypeEnum.ENHANCE.getValue(), request);
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public PictureEditTaskVO replaceBackground(PictureReplaceBackgroundRequest request, User loginUser) {
-        // 校验参数
-        ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR);
-        ThrowUtils.throwIf(request.getPictureId() == null, ErrorCode.PARAMS_ERROR, "图片ID不能为空");
-        ThrowUtils.throwIf(StrUtil.isBlank(request.getBackgroundType()), ErrorCode.PARAMS_ERROR, "背景类型不能为空");
-
-        // 获取原图信息
-        Picture picture = pictureMapper.selectById(request.getPictureId());
-        ThrowUtils.throwIf(picture == null, ErrorCode.NOT_FOUND_ERROR, "图片不存在");
-
-        // 权限校验
-        checkEditPermission(picture, loginUser);
-
-        // 获取图片URL
-        String imageUrl = getImageUrl(picture);
-
-        // 构建请求
-        CreateImageEditTaskRequest apiRequest = buildBaseRequest();
-        apiRequest.getInput().setFunction("description_edit");
-        String prompt = buildReplaceBackgroundPrompt(request.getBackgroundType(), request.getBackgroundValue());
-        apiRequest.getInput().setPrompt(prompt);
-        apiRequest.getInput().setBaseImageUrl(imageUrl);
-
-        // 创建任务
-        return createEditTask(apiRequest, picture.getId(), loginUser.getId(),
-                PictureEditTypeEnum.REPLACE_BACKGROUND.getValue(), request);
     }
 
     @Override
@@ -348,22 +317,6 @@ public class PictureEditServiceImpl extends ServiceImpl<PictureEditTaskMapper, P
                 return "图像上色，让色彩更鲜艳";
             default:
                 return "图像增强";
-        }
-    }
-
-    /**
-     * 构建背景替换提示词
-     */
-    private String buildReplaceBackgroundPrompt(String backgroundType, String backgroundValue) {
-        switch (backgroundType) {
-            case "color":
-                return "将背景替换为" + backgroundValue + "颜色";
-            case "image":
-                return "将背景替换为指定的图片背景";
-            case "transparent":
-                return "去除背景，使背景透明";
-            default:
-                return "替换背景";
         }
     }
 
