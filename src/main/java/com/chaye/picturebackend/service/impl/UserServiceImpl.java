@@ -73,6 +73,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         if (userPassword.length() < 8 || checkPassword.length() < 8) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户密码过短");
         }
+        if (userPassword.length() > 72 || checkPassword.length() > 72) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户密码过长，不能超过 72 位");
+        }
         if (!userPassword.equals(checkPassword)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "两次输入的密码不一致");
         }
@@ -107,22 +110,22 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         if (userAccount.length() < 4) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户账号错误");
         }
-        if (userPassword.length() < 8) {
+        if (userPassword.length() < 8 || userPassword.length() > 72) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户密码错误");
         }
         // 2. 先根据用户名查询用户
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("userAccount", userAccount);
         User user = this.baseMapper.selectOne(queryWrapper);
-        // 不存在，抛异常
+        // 不存在，抛异常（统一错误消息，防止用户枚举）
         if (user == null) {
             log.info("user login failed, userAccount not found");
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户不存在或者密码错误");
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户名或密码错误");
         }
-        // 3. 使用 BCrypt 验证密码
+        // 3. 使用 BCrypt 验证密码（统一错误消息，防止用户枚举）
         if (!bCryptPasswordEncoder.matches(userPassword, user.getUserPassword())) {
             log.info("user login failed, password mismatch");
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户不存在或者密码错误");
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户名或密码错误");
         }
         // 4. 保存用户的登录态
         request.getSession().setAttribute(UserConstant.USER_LOGIN_STATE, user);
@@ -216,8 +219,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         if (userObj == null) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "未登录");
         }
-        // 移除登录态
+        // 移除登录态（清理 Spring Session）
         request.getSession().removeAttribute(UserConstant.USER_LOGIN_STATE);
+        // 同时登出 Sa-Token（确保两个会话系统同步）
+        StpKit.SPACE.logout();
         return true;
     }
 
@@ -368,6 +373,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         }
         if (userPassword.length() < 8) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "新密码长度不能少于 8 位");
+        }
+        if (userPassword.length() > 72) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "新密码长度不能超过 72 位");
         }
         // 2. 查询用户是否存在
         User user = this.getById(id);
