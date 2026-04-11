@@ -32,7 +32,7 @@ public class PictureEditTaskVO implements Serializable {
     private Long userId;
 
     /**
-     * 编辑类型：SEGMENT/REMOVE_WATERMARK/ENHANCE/REPLACE_BACKGROUND
+     * 编辑类型：SEGMENT/REMOVE_WATERMARK/ENHANCE
      */
     private String editType;
 
