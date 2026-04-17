@@ -16,7 +16,7 @@ public class ImageGenerationConfig {
     /**
      * 默认图像模型
      */
-    private String defaultModel = "wanx-v1";
+    private String defaultModel = "wan2.7-image-pro";
 
     /**
      * 默认图像尺寸

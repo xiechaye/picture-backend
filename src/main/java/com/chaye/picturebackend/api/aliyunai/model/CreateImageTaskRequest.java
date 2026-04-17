@@ -12,9 +12,9 @@ import java.io.Serializable;
 public class CreateImageTaskRequest implements Serializable {
 
     /**
-     * 模型，wanx-v1
+     * 模型，wan2.7-image-pro
      */
-    private String model = "wanx-v1";
+    private String model = "wan2.7-image-pro";
 
     /**
      * 输入信息

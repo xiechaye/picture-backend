@@ -1,16 +1,20 @@
 package com.chaye.picturebackend.manager;
 
 import com.qcloud.cos.COSClient;
+import com.qcloud.cos.http.HttpMethodName;
 import com.qcloud.cos.model.COSObject;
 import com.qcloud.cos.model.GetObjectRequest;
 import com.qcloud.cos.model.PutObjectRequest;
 import com.qcloud.cos.model.PutObjectResult;
 import com.qcloud.cos.model.ciModel.persistence.PicOperations;
+import com.qcloud.cos.model.GeneratePresignedUrlRequest;
 import com.chaye.picturebackend.config.CosClientConfig;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.Resource;
 import java.io.File;
+import java.net.URL;
+import java.util.Date;
 
 @Component
 public class CosManager {
@@ -127,5 +131,36 @@ public class CosManager {
      */
     public void deleteObject(String key) {
         cosClient.deleteObject(cosClientConfig.getBucket(), key);
+    }
+
+    /**
+     * 生成预签名 URL
+     * <p>
+     * 用于临时授权访问私有桶中的文件，适用于 AI 服务访问图片
+     *
+     * @param key        唯一键
+     * @param expiration 过期时间（秒），默认 3600 秒（1 小时）
+     * @return 预签名 URL
+     */
+    public String generatePresignedUrl(String key, long expiration) {
+        GeneratePresignedUrlRequest request = new GeneratePresignedUrlRequest(
+                cosClientConfig.getBucket(),
+                key,
+                HttpMethodName.GET
+        );
+        // 设置过期时间
+        request.setExpiration(new Date(System.currentTimeMillis() + expiration * 1000L));
+        URL url = cosClient.generatePresignedUrl(request);
+        return url.toString();
+    }
+
+    /**
+     * 生成预签名 URL（默认 1 小时有效期）
+     *
+     * @param key 唯一键
+     * @return 预签名 URL
+     */
+    public String generatePresignedUrl(String key) {
+        return generatePresignedUrl(key, 3600);
     }
 }

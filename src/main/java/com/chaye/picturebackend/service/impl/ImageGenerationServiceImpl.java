@@ -4,10 +4,8 @@ import cn.hutool.core.io.FileUtil;
 import cn.hutool.http.HttpUtil;
 import com.chaye.picturebackend.agent.ImagePromptOptimizerManus;
 import com.chaye.picturebackend.agent.config.ImageGenerationConfig;
+import com.alibaba.dashscope.aigc.imagegeneration.ImageGenerationResult;
 import com.chaye.picturebackend.api.aliyunai.ImageGenerationApi;
-import com.chaye.picturebackend.api.aliyunai.model.CreateImageTaskRequest;
-import com.chaye.picturebackend.api.aliyunai.model.CreateImageTaskResponse;
-import com.chaye.picturebackend.api.aliyunai.model.GetImageTaskResponse;
 import com.chaye.picturebackend.exception.BusinessException;
 import com.chaye.picturebackend.exception.ErrorCode;
 import com.chaye.picturebackend.exception.ThrowUtils;
@@ -76,19 +74,18 @@ public class ImageGenerationServiceImpl implements ImageGenerationService {
                 : null;
 
         // 创建图像生成任务
-        CreateImageTaskResponse createResponse = createImageGenerationTask(finalPrompt, size);
-        String taskId = createResponse.getOutput().getTaskId();
+        ImageGenerationResult createResult = createImageGenerationTask(finalPrompt, size);
+        String taskId = imageGenerationApi.getTaskId(createResult);
 
         log.info("图像生成任务创建成功，taskId: {}", taskId);
 
         // 轮询任务状态
-        GetImageTaskResponse taskResponse = pollTaskStatus(taskId);
-        List<GetImageTaskResponse.ImageResult> results = taskResponse.getOutput().getResults();
+        ImageGenerationResult taskResult = pollTaskStatus(taskId);
+        String imageUrl = imageGenerationApi.getFirstImageUrl(taskResult);
 
-        ThrowUtils.throwIf(results == null || results.isEmpty(),
+        ThrowUtils.throwIf(imageUrl == null,
                 ErrorCode.OPERATION_ERROR, "图像生成失败：未返回结果");
 
-        String imageUrl = results.get(0).getUrl();
         log.info("图像生成成功，imageUrl: {}", imageUrl);
 
         // 下载并上传到 COS
@@ -218,33 +215,88 @@ public class ImageGenerationServiceImpl implements ImageGenerationService {
      * @param recommendedSize 推荐尺寸（格式："width,height"，可为 null）
      * @return 任务创建响应
      */
-    private CreateImageTaskResponse createImageGenerationTask(String finalPrompt, String recommendedSize) {
-        CreateImageTaskRequest request = new CreateImageTaskRequest();
-        request.setModel(config.getDefaultModel());
-
-        CreateImageTaskRequest.Input input = new CreateImageTaskRequest.Input();
-        input.setPrompt(finalPrompt);
-        request.setInput(input);
-
-        CreateImageTaskRequest.Parameters parameters = new CreateImageTaskRequest.Parameters();
-
+    private ImageGenerationResult createImageGenerationTask(String finalPrompt, String recommendedSize) {
         // 处理尺寸参数
         String apiSize;
         if (recommendedSize != null && !recommendedSize.isBlank()) {
-            // 转换格式：从 "width,height" 到 "width*height"
-            apiSize = AspectRatioTool.convertToApiFormat(recommendedSize.trim());
-            log.info("使用推荐尺寸: {}", apiSize);
+            // 转换格式：从 "width,height" 到 wan2.7 格式 (2K, 1K, 4K)
+            apiSize = convertSizeToWan27Format(recommendedSize.trim());
+            log.info("使用推荐尺寸: {} (原始: {})", apiSize, recommendedSize);
         } else {
             apiSize = config.getDefaultSize();
             log.info("使用默认尺寸: {}", apiSize);
         }
 
-        parameters.setSize(apiSize);
-        parameters.setN(config.getDefaultImageCount());
+        return imageGenerationApi.createTextToImageTask(finalPrompt, apiSize, config.getDefaultImageCount());
+    }
 
-        request.setParameters(parameters);
+    /**
+     * 将旧版尺寸格式转换为 wan2.7-image-pro 格式
+     *
+     * @param sizeStr 旧版尺寸格式（如 "1024*1024" 或 "1024,1024"）
+     * @return wan2.7 格式（如 "2K"）
+     */
+    private String convertSizeToWan27Format(String sizeStr) {
+        if (sizeStr == null || sizeStr.isEmpty()) {
+            return "2K"; // 默认
+        }
 
-        return imageGenerationApi.createImageTask(request);
+        // 处理逗号分隔格式
+        if (sizeStr.contains(",")) {
+            String[] parts = sizeStr.split(",");
+            if (parts.length == 2) {
+                try {
+                    int width = Integer.parseInt(parts[0].trim());
+                    int height = Integer.parseInt(parts[1].trim());
+                    return sizeToWan27Format(width, height);
+                } catch (NumberFormatException e) {
+                    log.warn("无法解析尺寸: {}", sizeStr);
+                }
+            }
+            return "2K";
+        }
+
+        // 处理星号分隔格式
+        if (sizeStr.contains("*")) {
+            String[] parts = sizeStr.split("\\*");
+            if (parts.length == 2) {
+                try {
+                    int width = Integer.parseInt(parts[0].trim());
+                    int height = Integer.parseInt(parts[1].trim());
+                    return sizeToWan27Format(width, height);
+                } catch (NumberFormatException e) {
+                    log.warn("无法解析尺寸: {}", sizeStr);
+                }
+            }
+            return "2K";
+        }
+
+        // 已经是 wan2.7 格式
+        if ("1K".equals(sizeStr) || "2K".equals(sizeStr) || "4K".equals(sizeStr)) {
+            return sizeStr;
+        }
+
+        return "2K"; // 默认
+    }
+
+    /**
+     * 根据宽高计算 wan2.7 格式
+     */
+    private String sizeToWan27Format(int width, int height) {
+        // 计算总像素数
+        long totalPixels = (long) width * height;
+
+        // 根据像素数判断级别
+        // 1K ≈ 1M 像素 (如 1024*1024)
+        // 2K ≈ 2M 像素 (如 2048*1024 或类似)
+        // 4K ≈ 4M+ 像素
+        if (totalPixels >= 4000000) {
+            return "4K";
+        } else if (totalPixels >= 2000000) {
+            return "2K";
+        } else {
+            return "1K";
+        }
     }
 
     /**
@@ -253,24 +305,25 @@ public class ImageGenerationServiceImpl implements ImageGenerationService {
      * @param taskId 任务 ID
      * @return 任务响应
      */
-    private GetImageTaskResponse pollTaskStatus(String taskId) {
+    private ImageGenerationResult pollTaskStatus(String taskId) {
         int maxRetries = config.getMaxPollingRetries();
         long currentInterval = config.getInitialPollingInterval();
         int retryCount = 0;
 
         while (retryCount < maxRetries) {
             try {
-                GetImageTaskResponse taskResponse = imageGenerationApi.getImageTask(taskId);
-                String taskStatus = taskResponse.getOutput().getTaskStatus();
+                ImageGenerationResult taskResult = imageGenerationApi.getTaskResult(taskId);
+                String taskStatus = imageGenerationApi.getTaskStatus(taskResult);
 
                 log.info("任务状态: {} (执行 {}/{})", taskStatus, retryCount + 1, maxRetries);
 
-                if ("SUCCEEDED".equals(taskStatus)) {
-                    return taskResponse;
-                } else if ("FAILED".equals(taskStatus)) {
-                    String errorMessage = taskResponse.getOutput().getMessage();
-                    throw new BusinessException(ErrorCode.OPERATION_ERROR,
-                            "图像生成任务失败: " + errorMessage);
+                if (imageGenerationApi.isFinished(taskResult)) {
+                    if (imageGenerationApi.isFailed(taskResult)) {
+                        String errorMessage = imageGenerationApi.getErrorMessage(taskResult);
+                        throw new BusinessException(ErrorCode.OPERATION_ERROR,
+                                "图像生成任务失败: " + errorMessage);
+                    }
+                    return taskResult;
                 }
 
                 // 等待后重试

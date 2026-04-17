@@ -168,7 +168,7 @@ aliYunAi:
 agent:
   image-generation:
     # 基础配置
-    default-model: wanx-v1
+    default-model: wan2.7-image-pro
     default-size: 1024*1024
     default-image-count: 1
 

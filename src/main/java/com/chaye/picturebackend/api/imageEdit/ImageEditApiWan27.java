@@ -1,12 +1,10 @@
-package com.chaye.picturebackend.api.aliyunai;
+package com.chaye.picturebackend.api.imageEdit;
 
 import com.alibaba.dashscope.aigc.imagegeneration.ImageGeneration;
-import com.alibaba.dashscope.aigc.imagegeneration.ImageGenerationMessage;
 import com.alibaba.dashscope.aigc.imagegeneration.ImageGenerationParam;
 import com.alibaba.dashscope.aigc.imagegeneration.ImageGenerationResult;
 import com.alibaba.dashscope.exception.ApiException;
 import com.alibaba.dashscope.exception.NoApiKeyException;
-import com.alibaba.dashscope.exception.UploadFileException;
 import com.alibaba.dashscope.utils.Constants;
 import com.chaye.picturebackend.api.aliyunai.model.Wan27ImageGenerationRequest;
 import com.chaye.picturebackend.exception.BusinessException;
@@ -16,19 +14,18 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * 阿里云 wan2.7-image-pro 图像生成 API（使用官方 SDK）
+ * 阿里云 wan2.7-image-pro 图像编辑 API（使用官方 SDK）
  * <p>
- * 使用 DashScope SDK 调用，与 ImageEditApiWan27 保持一致的调用方式
+ * 使用 DashScope SDK 调用，避免 HTTP 请求格式问题
  */
 @Slf4j
 @Component
-public class ImageGenerationApi {
+public class ImageEditApiWan27 {
 
     static {
         // 设置北京地域 URL
@@ -39,66 +36,14 @@ public class ImageGenerationApi {
     private String apiKey;
 
     /**
-     * 使用 SDK 创建图像生成任务（文生图）
+     * 使用 SDK 创建图像编辑任务
      *
-     * @param prompt 文生图提示词
-     * @param size   图片尺寸（wan2.7 格式：2K, 1K, 4K）
-     * @param n      生成数量
-     * @return SDK 原始响应
-     */
-    public ImageGenerationResult createTextToImageTask(String prompt, String size, Integer n) {
-        if (prompt == null || prompt.isEmpty()) {
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "图像描述不能为空");
-        }
-
-        try {
-            // 构建 SDK 参数 - 文生图格式
-            ImageGenerationParam.ImageGenerationParamBuilder<?, ?> builder = ImageGenerationParam.builder()
-                    .apiKey(apiKey)
-                    .model("wan2.7-image-pro")
-                    .n(n != null ? n : 1)
-                    .size(size != null ? size : "2K");
-
-            // 构建消息 - 文生图只有文本内容
-            ImageGenerationMessage message = ImageGenerationMessage.builder()
-                    .role("user")
-                    .content(Collections.singletonList(
-                            Collections.singletonMap("text", prompt)
-                    )).build();
-
-            builder.messages(Collections.singletonList(message));
-
-            ImageGenerationParam param = builder.build();
-
-            log.info("=== wan2.7-image-pro 文生图 SDK 调用 ===");
-            log.info("提示词: {}", prompt);
-            log.info("尺寸: {}, 数量: {}", param.getSize(), param.getN());
-
-            // 使用 SDK 调用
-            ImageGeneration imageGeneration = new ImageGeneration();
-            return imageGeneration.asyncCall(param);
-
-        } catch (NoApiKeyException e) {
-            log.error("API Key 未配置", e);
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "API Key 未配置");
-        } catch (ApiException | UploadFileException e) {
-            log.error("wan2.7-image-pro API 调用失败: {}", e.getMessage(), e);
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "AI 图像生成失败：" + e.getMessage());
-        } catch (Exception e) {
-            log.error("wan2.7-image-pro 调用异常", e);
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "AI 图像生成失败");
-        }
-    }
-
-    /**
-     * 使用 SDK 创建图像生成任务（通用格式，支持图生图、编辑等）
-     *
-     * @param request Wan27ImageGenerationRequest 请求
+     * @param request 编辑请求
      * @return SDK 原始响应
      */
     public ImageGenerationResult createTask(Wan27ImageGenerationRequest request) {
         if (request == null) {
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "图像生成参数为空");
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "图像编辑参数为空");
         }
 
         try {
@@ -115,12 +60,12 @@ public class ImageGenerationApi {
         } catch (NoApiKeyException e) {
             log.error("API Key 未配置", e);
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "API Key 未配置");
-        } catch (ApiException | UploadFileException e) {
+        } catch (ApiException e) {
             log.error("wan2.7-image-pro API 调用失败: {}", e.getMessage(), e);
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "AI 图像生成失败：" + e.getMessage());
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "AI 图像编辑失败：" + e.getMessage());
         } catch (Exception e) {
             log.error("wan2.7-image-pro 调用异常", e);
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "AI 图像生成失败");
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "AI 图像编辑失败");
         }
     }
 
@@ -249,10 +194,10 @@ public class ImageGenerationApi {
 
         // 转换 messages 格式
         if (request.getInput() != null && request.getInput().getMessages() != null) {
-            List<ImageGenerationMessage> messages = new ArrayList<>();
+            List<com.alibaba.dashscope.aigc.imagegeneration.ImageGenerationMessage> messages = new ArrayList<>();
             for (Wan27ImageGenerationRequest.Message msg : request.getInput().getMessages()) {
-                ImageGenerationMessage sdkMsg =
-                        ImageGenerationMessage.builder()
+                com.alibaba.dashscope.aigc.imagegeneration.ImageGenerationMessage sdkMsg =
+                        com.alibaba.dashscope.aigc.imagegeneration.ImageGenerationMessage.builder()
                                 .role(msg.getRole() != null ? msg.getRole() : "user")
                                 .content(convertContent(msg.getContent()))
                                 .build();
