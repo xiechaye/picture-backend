@@ -394,6 +394,18 @@ public class PictureController {
     }
 
     /**
+     * 批量删除图片
+     */
+    @PostMapping("/delete/batch")
+    @SaSpaceCheckPermission(value = SpaceUserPermissionConstant.PICTURE_DELETE)
+    public BaseResponse<Boolean> deletePictureByBatch(@RequestBody PictureDeleteByBatchRequest pictureDeleteByBatchRequest, HttpServletRequest request) {
+        ThrowUtils.throwIf(pictureDeleteByBatchRequest == null, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        pictureService.deletePictureByBatch(pictureDeleteByBatchRequest, loginUser);
+        return ResultUtils.success(true);
+    }
+
+    /**
      * 创建 AI 扩图任务
      */
     @PostMapping("/out_painting/create_task")

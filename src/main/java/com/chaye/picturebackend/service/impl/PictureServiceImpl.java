@@ -543,6 +543,63 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
     }
 
     @Override
+    public void deletePictureByBatch(PictureDeleteByBatchRequest pictureDeleteByBatchRequest, User loginUser) {
+        // 1. 获取和校验参数
+        List<Long> pictureIdList = pictureDeleteByBatchRequest.getPictureIdList();
+        Long spaceId = pictureDeleteByBatchRequest.getSpaceId();
+        ThrowUtils.throwIf(CollUtil.isEmpty(pictureIdList), ErrorCode.PARAMS_ERROR, "图片ID列表不能为空");
+        ThrowUtils.throwIf(spaceId == null, ErrorCode.PARAMS_ERROR, "空间ID不能为空");
+        ThrowUtils.throwIf(loginUser == null, ErrorCode.NO_AUTH_ERROR);
+
+        // 2. 校验空间权限
+        Space space = spaceService.getById(spaceId);
+        ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR, "空间不存在");
+        if (!space.getUserId().equals(loginUser.getId())) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "没有空间访问权限");
+        }
+
+        // 3. 查询指定图片
+        List<Picture> pictureList = this.lambdaQuery()
+                .select(Picture::getId, Picture::getSpaceId, Picture::getPicSize, Picture::getUrl)
+                .eq(Picture::getSpaceId, spaceId)
+                .in(Picture::getId, pictureIdList)
+                .list();
+
+        if (pictureList.isEmpty()) {
+            return;
+        }
+
+        // 4. 计算需要释放的空间总额度
+        final long totalSizeToRelease;
+        long sizeSum = 0;
+        for (Picture picture : pictureList) {
+            sizeSum += picture.getPicSize();
+        }
+        totalSizeToRelease = sizeSum;
+
+        final int totalCountToRelease = pictureList.size();
+
+        // 5. 开启事务执行批量删除
+        transactionTemplate.execute(status -> {
+            // 批量删除图片记录
+            boolean result = this.removeByIds(pictureIdList);
+            ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "批量删除失败");
+
+            // 更新空间的使用额度，释放额度
+            boolean update = spaceService.lambdaUpdate()
+                    .eq(Space::getId, spaceId)
+                    .setSql("totalSize = totalSize - " + totalSizeToRelease)
+                    .setSql("totalCount = totalCount - " + totalCountToRelease)
+                    .update();
+            ThrowUtils.throwIf(!update, ErrorCode.OPERATION_ERROR, "额度更新失败");
+            return true;
+        });
+
+        // 6. 异步清理文件
+        pictureList.forEach(this::clearPictureFile);
+    }
+
+    @Override
     public void editPicture(PictureEditRequest pictureEditRequest, User loginUser) {
         // 在此处将实体类和 DTO 进行转换
         Picture picture = new Picture();
