@@ -13,7 +13,6 @@ import com.chaye.picturebackend.api.imageEdit.ImageEditApiWan27;
 import com.chaye.picturebackend.exception.BusinessException;
 import com.chaye.picturebackend.exception.ErrorCode;
 import com.chaye.picturebackend.exception.ThrowUtils;
-import com.chaye.picturebackend.config.ImageSegmentPromptConfig;
 import com.chaye.picturebackend.manager.CosManager;
 import com.chaye.picturebackend.manager.auth.SpaceUserAuthManager;
 import com.chaye.picturebackend.manager.auth.model.SpaceUserPermissionConstant;
