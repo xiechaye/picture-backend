@@ -5,6 +5,8 @@ import com.chaye.picturebackend.model.entity.Space;
 import com.chaye.picturebackend.model.enums.SpaceLevelEnum;
 import com.chaye.picturebackend.model.enums.SpaceTypeEnum;
 import com.chaye.picturebackend.service.SpaceService;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.shardingsphere.driver.jdbc.core.connection.ShardingSphereConnection;
 import org.apache.shardingsphere.infra.metadata.database.rule.RuleMetaData;
@@ -13,11 +15,8 @@ import org.apache.shardingsphere.sharding.api.config.ShardingRuleConfiguration;
 import org.apache.shardingsphere.sharding.api.config.rule.ShardingTableRuleConfiguration;
 import org.apache.shardingsphere.sharding.rule.ShardingRule;
 
-import jakarta.annotation.PostConstruct;
-import jakarta.annotation.Resource;
 import javax.sql.DataSource;
 import java.sql.SQLException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -99,8 +98,6 @@ public class DynamicShardingManager {
             ruleConfig.setTables(updatedRules);
             contextManager.getInstanceContext().getModeContextManager()
                     .alterRuleConfiguration(DATABASE_NAME, ruleConfig);
-            // todo 刷新数据库
-//            contextManager.reloadTable(DATABASE_NAME);
             log.info("动态分表规则更新成功！");
         } else {
             log.error("未找到 ShardingSphere 的分片规则配置，动态分表更新失败。");

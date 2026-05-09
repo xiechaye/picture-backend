@@ -21,9 +21,7 @@ public class PgVectorConfig {
     @Value("${spring.ai.vectorstore.dimensions:1024}")
     private int dimensions;
 
-    // ==========================================
     // 1. 读取配置 & 创建数据源
-    // ==========================================
 
     @Bean
     @ConfigurationProperties(prefix = "spring.datasource.vector") // 对应 YAML 中的 vector
@@ -36,18 +34,14 @@ public class PgVectorConfig {
         return properties.initializeDataSourceBuilder().build();
     }
 
-    // ==========================================
     // 2. 创建专用 JdbcTemplate
-    // ==========================================
 
     @Bean(name = "vectorJdbcTemplate")
     public JdbcTemplate vectorJdbcTemplate(@Qualifier("vectorDataSource") DataSource dataSource) {
         return new JdbcTemplate(dataSource);
     }
 
-    // ==========================================
     // 3. Spring AI VectorStore 配置
-    // ==========================================
 
     @Bean
     public VectorStore vectorStore(

@@ -56,8 +56,7 @@ public class ImageMqListener {
                 return;
             }
 
-            // 1. 生成预签名 URL (关键步骤)
-            // 这个 URL 包含了鉴权信息，有效期内任何人都可访问（包括阿里千问），无需将桶设为公有
+            // 1. 生成预签名 URL
             String signedUrl = generatePresignedUrl(picture.getUrl());
             log.info("已生成临时授权 URL，准备请求 AI");
 
@@ -74,7 +73,6 @@ public class ImageMqListener {
         } catch (Exception e) {
             log.error("处理失败，图片ID: {}", pictureId, e);
             try {
-                // 遇到 AI 报错不建议立刻重试，避免死循环，根据业务决定是 Nack 还是记录日志后 Ack
                 channel.basicNack(deliveryTag, false, false);
             } catch (IOException ex) {
                 log.error("消息确认失败", ex);
@@ -106,7 +104,7 @@ public class ImageMqListener {
                     .apiKey(dashScopeApiKey) // 显式传入 Key
                     .model("qwen-vl-max")    // 使用效果最好的模型
                     .messages(Collections.singletonList(userMessage))
-                    .topP(0.8)               // 可选：生成参数微调
+                    .topP(0.8)               // 生成参数微调
                     .build();
 
             // 发起调用
