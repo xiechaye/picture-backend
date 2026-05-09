@@ -123,14 +123,6 @@ public interface PictureService extends IService<Picture> {
     void editPicture(PictureEditRequest pictureEditRequest, User loginUser);
 
     /**
-     * 校验空间图片的权限
-     *
-     * @param loginUser
-     * @param picture
-     */
-    void checkPictureAuth(User loginUser, Picture picture);
-
-    /**
      * 根据颜色搜索图片
      *
      * @param spaceId
