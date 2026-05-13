@@ -36,7 +36,20 @@ public class PictureEditEventWorkHandler implements WorkHandler<PictureEditEvent
         Long pictureId = pictureEditEvent.getPictureId();
         // 获取到消息类别
         String type = pictureEditRequestMessage.getType();
+        // 忽略心跳消息
+        if ("ping".equalsIgnoreCase(type)) {
+            return;
+        }
         PictureEditMessageTypeEnum pictureEditMessageTypeEnum = PictureEditMessageTypeEnum.getEnumByValue(type);
+        if (pictureEditMessageTypeEnum == null) {
+            log.warn("无效的消息类型: {}", type);
+            PictureEditResponseMessage pictureEditResponseMessage = new PictureEditResponseMessage();
+            pictureEditResponseMessage.setType(PictureEditMessageTypeEnum.ERROR.getValue());
+            pictureEditResponseMessage.setMessage("消息类型错误");
+            pictureEditResponseMessage.setUser(userService.getUserVO(user));
+            session.sendMessage(new TextMessage(JSONUtil.toJsonStr(pictureEditResponseMessage)));
+            return;
+        }
         // 根据消息类型处理消息
         switch (pictureEditMessageTypeEnum) {
             case ENTER_EDIT:

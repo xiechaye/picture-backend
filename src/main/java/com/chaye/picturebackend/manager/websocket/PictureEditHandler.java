@@ -228,7 +228,11 @@ public class PictureEditHandler extends TextWebSocketHandler {
                     continue;
                 }
                 if (session.isOpen()) {
-                    session.sendMessage(textMessage);
+                    try {
+                        session.sendMessage(textMessage);
+                    } catch (IOException e) {
+                        log.warn("发送消息失败，session 可能已关闭: {}", session.getId());
+                    }
                 }
             }
         }
