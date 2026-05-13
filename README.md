@@ -18,6 +18,15 @@
 
 Picture Backend 是一个功能完善的智能图片管理后端系统，集成了 AI 图像分析、向量语义搜索、多用户协作编辑等能力。系统采用双数据源架构（MySQL + PostgreSQL/pgvector），支持按空间动态分表、实时 WebSocket 协作、AI Agent 智能工具调用等特性。
 
+## 项目亮点
+
+| 亮点 | 说明 |
+|------|------|
+| **模板方法模式上传** | `PictureUploadTemplate` 定义上传流程骨架（校验→获取文件名→处理→上传COS→清理），通过 `FilePictureUpload` 和 `UrlPictureUpload` 扩展不同输入源，新增上传方式只需实现抽象方法 |
+| **RabbitMQ 异步 AI 分析 + PgVector 语义检索** | 图片上传后通过 RabbitMQ 异步触发 AI 图像理解（qwen-vl-max），生成描述文本经 text-embedding-v2 向量化后存入 PgVector，支持自然语言语义搜索和以图搜图 |
+| **Sa-Token 双层空间权限体系** | 系统级权限（管理员）+ 空间级 RBAC 权限（viewer/editor/admin）双层控制，通过自定义 `@SaSpaceCheckPermission` 注解实现空间维度的细粒度权限校验，支持私有空间和团队空间 |
+| **WebSocket + Disruptor 协同编辑** | WebSocket 实现实时双向通信，Disruptor 环形缓冲区（256KB）作为高性能事件队列，支持多用户同时编辑同一图片时的状态同步和冲突管理 |
+
 ## 功能特性
 
 ### 图片管理
